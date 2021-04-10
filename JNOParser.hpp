@@ -1,19 +1,17 @@
 #pragma once
 
-#include <stdio>
-#include <memory>
-#include <map>
 #include <string>
-#include <stdint.h>
+#include <map>
+#include <vector>
 
-
-namespace JNOParser {
+namespace RoninEngine {
 	static const struct {
 		char dot = '.';
 		char obstacle = ',';
 		char space = ' ';
 		char nodePathBreaker = '/';
 		char commentLine[3] = "//";
+        char left_seperator = '\\';
 		char eof_segment = '\n';
 		char format_string = '\"';
 		char true_string[5]{ "true" };
@@ -48,15 +46,15 @@ namespace JNOParser {
 		std::string propertyName;
 		std::uint8_t valueFlag;
 		void* value = 0;
-		mutable int* uses = NULL;
+		mutable int* uses = nullptr;
 
 		void*& setMemory(void* mem);
 		int decrementMemory();
 		int incrementMemory();
 
 #ifdef _DEBUG
-		ObjectNode* prevNode = NULL;
-		ObjectNode* nextNode = NULL;
+		ObjectNode* prevNode = nullptr;
+		ObjectNode* nextNode = nullptr;
 #endif
 
 	public:
@@ -83,10 +81,10 @@ namespace JNOParser {
 		std::string& toString();
 		bool& toBoolean();
 
-		vector<std::int64_t>* toNumbers();
-		vector<double>* toReals();
-		vector<std::string>* toStrings();
-		vector<bool>* toBooleans();
+        std::vector<std::int64_t>* toNumbers();
+        std::vector<double>* toReals();
+        std::vector<std::string>* toStrings();
+        std::vector<bool>* toBooleans();
 
 	};
 
@@ -102,11 +100,12 @@ namespace JNOParser {
 	public:
 		ObjectParser();
 		ObjectParser(const ObjectParser&) = delete;
-		~ObjectParser() = default;
+        ~ObjectParser() = default;
 
 		void Deserialize(const char* filename);
 		void Deserialize(const std::string& source);
 		void Deserialize(const char* source, int len);
+        void deserialize(const std::string& content, int depth = -1);
 		std::string Serialize();
 
 		//Find node
@@ -125,6 +124,6 @@ namespace JNOParser {
 		void Clear();
 	};
 
-	int stringToHash(const char* str, int len = INT_MAX);
+    int stringToHash(const char* str, int len = INT32_MAX);
 
 }
