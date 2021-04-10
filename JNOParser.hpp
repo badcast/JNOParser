@@ -1,129 +1,116 @@
 #pragma once
 
-#include <string>
 #include <map>
+#include <string>
 #include <vector>
 
 namespace RoninEngine {
-	static const struct {
-		char dot = '.';
-		char obstacle = ',';
-		char space = ' ';
-		char nodePathBreaker = '/';
-		char commentLine[3] = "//";
-        char left_seperator = '\\';
-		char eof_segment = '\n';
-		char format_string = '\"';
-		char true_string[5]{ "true" };
-		char false_string[6]{ "false" };
-		char array_segments[2]{ '{', '}' };
-		char trim_segments[5]{ ' ', '\t', '\n', '\r' , '\v' };
-	} syntax;
+static const struct {
+    char dot = '.';
+    char obstacle = ',';
+    char space = ' ';
+    char nodePathBreaker = '/';
+    char commentLine[3] = "//";
+    char left_seperator = '\\';
+    char eof_segment = '\n';
+    char format_string = '\"';
+    char true_string[5]{"true"};
+    char false_string[6]{"false"};
+    char array_segments[2]{'{', '}'};
+    char trim_segments[5]{' ', '\t', '\n', '\r', '\v'};
+} syntax;
 
-	enum ObjectSerializedFormat {
-		Normal,
-		WithOut_EOF,
-		WithOut_Tabs
-	};
+enum ObjectSerializedFormat { Normal, WithOut_EOF, WithOut_Tabs };
 
-	constexpr int Node_ValueFlag = 1;
-	constexpr int Node_ArrayFlag = 2;
-	constexpr int Node_StructFlag = 3;
+constexpr int Node_ValueFlag = 1;
+constexpr int Node_ArrayFlag = 2;
+constexpr int Node_StructFlag = 3;
 
-	class ObjectParser;
+class ObjectParser;
 
-	enum DataType
-	{
-		Unknown = 0,
-		String = 1,
-		Boolean = 2,
-		Real = 3,
-		Number = 4
-	};
+enum DataType { Unknown = 0, String = 1, Boolean = 2, Real = 3, Number = 4 };
 
-	class ObjectNode {
-		friend class ObjectParser;
-		std::string propertyName;
-		std::uint8_t valueFlag;
-		void* value = 0;
-		mutable int* uses = nullptr;
+class ObjectNode {
+    friend class ObjectParser;
+    std::string propertyName;
+    std::uint8_t valueFlag;
+    void* value = 0;
+    mutable int* uses = nullptr;
 
-		void*& setMemory(void* mem);
-		int decrementMemory();
-		int incrementMemory();
+    void*& setMemory(void* mem);
+    int decrementMemory();
+    int incrementMemory();
 
 #ifdef _DEBUG
-		ObjectNode* prevNode = nullptr;
-		ObjectNode* nextNode = nullptr;
+    ObjectNode* prevNode = nullptr;
+    ObjectNode* nextNode = nullptr;
 #endif
 
-	public:
-		ObjectNode() = default;
-		ObjectNode(const ObjectNode&);
+   public:
+    ObjectNode() = default;
+    ObjectNode(const ObjectNode&);
 
-		ObjectNode& operator=(const ObjectNode&);
+    ObjectNode& operator=(const ObjectNode&);
 
-		~ObjectNode();
+    ~ObjectNode();
 
-		inline bool	isArray();
-		inline bool	isStruct();
-		inline bool	isValue();
-		inline bool	isNumber();
-		inline bool	isReal();
-		inline bool	isString();
-		inline bool	isBoolean();
+    inline bool isArray();
+    inline bool isStruct();
+    inline bool isValue();
+    inline bool isNumber();
+    inline bool isReal();
+    inline bool isString();
+    inline bool isBoolean();
 
-		//Property name it is Node
-		std::string& getPropertyName();
+    // Property name it is Node
+    std::string& getPropertyName();
 
-		std::int64_t& toNumber();
-		double& toReal();
-		std::string& toString();
-		bool& toBoolean();
+    std::int64_t& toNumber();
+    double& toReal();
+    std::string& toString();
+    bool& toBoolean();
 
-        std::vector<std::int64_t>* toNumbers();
-        std::vector<double>* toReals();
-        std::vector<std::string>* toStrings();
-        std::vector<bool>* toBooleans();
+    std::vector<std::int64_t>* toNumbers();
+    std::vector<double>* toReals();
+    std::vector<std::string>* toStrings();
+    std::vector<bool>* toBooleans();
+};
 
-	};
+class ObjectParser {
+   public:
+    using _StructType = std::map<int, ObjectNode>;
 
-	class ObjectParser
-	{
-	public:
-		using _StructType = std::map<int, ObjectNode>;
-	private:
-		_StructType entry;
-		int avail(ObjectParser::_StructType& entry, const char* source, int len, int levels = 0);
+   private:
+    _StructType entry;
+    int avail(ObjectParser::_StructType& entry, const char* source, int len, int levels = 0);
 
+   public:
+    ObjectParser();
+    ObjectParser(const ObjectParser&) = delete;
+    ~ObjectParser() = default;
 
-	public:
-		ObjectParser();
-		ObjectParser(const ObjectParser&) = delete;
-        ~ObjectParser() = default;
+    void Deserialize(const char* filename);
+    void Deserialize(const std::string& source);
+    void Deserialize(const char* source, int len);
+    void deserialize(const std::string& content, int depth = -1);
+    std::string Serialize();
 
-		void Deserialize(const char* filename);
-		void Deserialize(const std::string& source);
-		void Deserialize(const char* source, int len);
-        void deserialize(const std::string& content, int depth = -1);
-		std::string Serialize();
+    // Find node
+    ObjectNode* GetNode(const std::string& name);
 
-		//Find node
-		ObjectNode* GetNode(const std::string& name);
+    _StructType& GetContainer();
+    _StructType& GetContainer(ObjectNode* node);
 
-		_StructType& GetContainer();
-		_StructType& GetContainer(ObjectNode* node);
+    // Find node from child
+    // example, key="First/Second/Triple" -> Node
+    // for has a node, HasNode
+    ObjectNode* FindNode(const std::string& nodePath);
 
-		//Find node from child 
-		//example, key="First/Second/Triple" -> Node
-		//for has a node, HasNode
-		ObjectNode* FindNode(const std::string& nodePath);
+    bool ContainsNode(const std::string& nodePath);
 
-		bool ContainsNode(const std::string& nodePath);
+    void Clear();
+};
 
-		void Clear();
-	};
+int stringToHash(const char* str, int len = INT32_MAX);
 
-    int stringToHash(const char* str, int len = INT32_MAX);
-
-}
+}  // namespace RoninEngine
