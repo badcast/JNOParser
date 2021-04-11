@@ -1,12 +1,8 @@
 #include "JNOParser.hpp"
 
-#include <cmath>
-#include <cstdint>
-#include <cstring>
-#include <fstream>
-#include <memory>
-#include <stdexcept>
-#include <vector>
+// TODO: feature - sync read
+// TODO: read block from disk
+
 namespace jno {
 
 const struct {
@@ -26,7 +22,17 @@ const struct {
     char node_name_concqt = '_';
 } syntax;
 
+constexpr int Node_ValueFlag = 1;
+constexpr int Node_ArrayFlag = 2;
+constexpr int Node_StructFlag = 3;
+
 enum data_type { unknown = 0, string = 1, boolean = 2, real = 3, number = 4 };
+
+template <typename T>
+inline std::enable_if<!std::is_pointer<T>::value, T*> allocate() {
+    T* mc = static_cast<T*>(malloc(sizeof(T)));
+    return mc;
+}
 
 static uint16_t trimpos(const char* c, int len = INT32_MAX) {
     uint16_t i, j;
@@ -63,9 +69,10 @@ static uint16_t trimposInvert(const char* c, int len = INT32_MAX) {
 static bool is_number(const char c) { return (c >= '0' && c <= '9') || c == '-'; }
 
 static bool is_real(const char* c, int* getLength) {
-    *getLength = 0;
     bool real = false;
-    while (true) {
+    if (getLength == nullptr) throw std::bad_exception();
+    *getLength = 0;
+    for(;;){
         if (!is_number(c[*getLength])) {
             if (real) break;
 
@@ -92,7 +99,7 @@ static int go_end_line(const char* c, int len = INT32_MAX) {
     return i;
 }
 
-static int Get_FormatType(const char* c, void** mem, DataType& out) {
+static int Get_FormatType(const char* c, void** mem, JData& out) {
     int temp;
 
     if (mem) *mem = nullptr;
@@ -105,39 +112,39 @@ static int Get_FormatType(const char* c, void** mem, DataType& out) {
         --temp;
         if (temp) {
             if (mem) {
-                std::string str;
+                jstring str;
                 str.reserve(temp);
                 for (size_t i = 0; i < temp; ++i) {
                     if (c[i + 1] == syntax.left_seperator) ++i;
                     str.push_back(c[i + 1]);
                 }
-                *mem = reinterpret_cast<void*>(new std::string(str));
+                *mem = reinterpret_cast<void*>(new jstring(str));
             }
-            out = DataType::String;
+            out = JData::String;
         } else
-            out = DataType::Unknown;
+            out = JData::Unknown;
 
         temp += 2;
     } else if (is_real(c, &temp)) {
         if (mem) *mem = new double(atof(c));
-        out = DataType::Real;
+        out = JData::Real;
     } else if (is_number(*c)) {
         if (mem) *mem = new int64_t(atoll(c));
-        out = DataType::Number;
+        out = JData::Number;
     } else if (is_bool(c, &temp)) {
         if (mem) *mem = new bool(temp == sizeof(syntax.true_string) - 1);
-        out = DataType::Boolean;
+        out = JData::Boolean;
     } else {
-        out = DataType::Unknown;
+        out = JData::Unknown;
         temp = 0;
     }
     return temp;
 }
 
 static bool Has_DataType(const char* currentPtr) {
-    DataType type;
+    JData type;
     Get_FormatType(const_cast<char*>(currentPtr), nullptr, type);
-    return type != DataType::Unknown;
+    return type != JData::Unknown;
 }
 
 inline int trim(const char* c, int len = INT32_MAX) {
@@ -178,7 +185,7 @@ inline int skip(const char* c, int len = INT32_MAX) {
 }
 
 inline bool isProperty(const char* c, int len) {
-    for (size_t i = 0; i < len; ++i)
+    for (int i = 0; c[i] && i < len; ++i)
         if (!((toupper(c[i]) >= 'A' && toupper(c[i]) <= 'Z') || (i > 0 && is_number(c[i])) || c[i] == syntax.node_name_concqt))
             return false;
     return len != 0;
@@ -257,25 +264,25 @@ JNode& JNode::operator=(const JNode& copy) {
 JNode::~JNode() {
     if (!decrementMemory() && value) {
         if (isStruct()) {
-            delete ((JNOParser::_StructType*)value);
+            delete ((JNOParser::JStruct*)value);
         } else if (isArray()) {
             switch (valueFlag >> 2) {
-                case DataType::Boolean:
+                case JData::Boolean:
                     delete (toBooleans());
                     break;
-                case DataType::String:
+                case JData::String:
                     delete (toStrings());
                     break;
-                case DataType::Number:
+                case JData::Number:
                     delete (toNumbers());
                     break;
-                case DataType::Real:
+                case JData::Real:
                     delete (toReals());
                     break;
             }
         } else if (isValue()) {
             if (isString()) {
-                delete ((std::string*)value);
+                delete ((jstring*)value);
             } else
                 free(value);
         }
@@ -307,12 +314,12 @@ int JNode::incrementMemory() {
 bool JNode::isValue() { return (this->valueFlag & 3) == Node_ValueFlag; }
 bool JNode::isArray() { return (this->valueFlag & 3) == Node_ArrayFlag; }
 bool JNode::isStruct() { return (this->valueFlag & 3) == Node_StructFlag; }
-bool JNode::isNumber() { return ((this->valueFlag & 0x1C) >> 2) == DataType::Number; }
-bool JNode::isReal() { return ((this->valueFlag & 0x1C) >> 2) == DataType::Real; }
-bool JNode::isString() { return ((this->valueFlag & 0x1C) >> 2) == DataType::String; }
-bool JNode::isBoolean() { return ((this->valueFlag & 0x1C) >> 2) == DataType::Boolean; }
+bool JNode::isNumber() { return ((this->valueFlag & 0x1C) >> 2) == JData::Number; }
+bool JNode::isReal() { return ((this->valueFlag & 0x1C) >> 2) == JData::Real; }
+bool JNode::isString() { return ((this->valueFlag & 0x1C) >> 2) == JData::String; }
+bool JNode::isBoolean() { return ((this->valueFlag & 0x1C) >> 2) == JData::Boolean; }
 
-std::string& JNode::getPropertyName() { return this->propertyName; }
+jstring JNode::getPropertyName() { return this->propertyName; }
 std::int64_t& JNode::toNumber() {
     if (!isNumber()) throw std::bad_cast();
 
@@ -322,44 +329,60 @@ double& JNode::toReal() {
     if (!isReal()) throw std::bad_cast();
     return *(double*)this->value;
 }
-std::string& JNode::toString() {
+jstring& JNode::toString() {
     if (!isString()) throw std::bad_cast();
-    return *(std::string*)this->value;
+    return *(jstring*)this->value;
 }
 bool& JNode::toBoolean() {
     if (!isBoolean()) throw std::bad_cast();
     return *(bool*)this->value;
 }
 std::vector<std::int64_t>* JNode::toNumbers() {
-    if (!isArray() && (valueFlag >> 2) != DataType::Number) throw std::bad_cast();
+    if (!isArray() && (valueFlag >> 2) != JData::Number) throw std::bad_cast();
     return (std::vector<std::int64_t>*)value;
 }
 std::vector<double>* JNode::toReals() {
-    if (!isArray() && (valueFlag >> 2) != DataType::Real) throw std::bad_cast();
+    if (!isArray() && (valueFlag >> 2) != JData::Real) throw std::bad_cast();
     return (std::vector<double>*)value;
 }
-std::vector<std::string>* JNode::toStrings() {
-    if (!isArray() && (valueFlag >> 2) != DataType::String) throw std::bad_cast();
-    return (std::vector<std::string>*)value;
+std::vector<jstring>* JNode::toStrings() {
+    if (!isArray() && (valueFlag >> 2) != JData::String) throw std::bad_cast();
+    return (std::vector<jstring>*)value;
 }
 std::vector<bool>* JNode::toBooleans() {
-    if (!isArray() && (valueFlag >> 2) != DataType::Boolean) throw std::bad_cast();
+    if (!isArray() && (valueFlag >> 2) != JData::Boolean) throw std::bad_cast();
     return (std::vector<bool>*)value;
 }
 
+jno::JNode::operator int() { return static_cast<int>(toNumber()); }
+
+jno::JNode::operator std::uint32_t() { return static_cast<std::uint32_t>(toNumber()); }
+
+jno::JNode::operator std::int64_t() { return toNumber(); }
+
+jno::JNode::operator std::uint64_t() { return toNumber(); }
+
+jno::JNode::operator double() { return toReal(); }
+
+jno::JNode::operator float() { return static_cast<float>(toReal()); }
+
+jno::JNode::operator jstring() { return toString(); }
+
+jno::JNode::operator bool() { return toBoolean(); }
+
 JNOParser::JNOParser() {}
 
-#ifdef _DEBUG
-static ObjectNode* _dbgLastNode;
+#ifdef DEBUG
+static JNode* _dbgLastNode;
 #endif
 
 // big algorithm, please free me.
-int JNOParser::avail(JNOParser::_StructType& entry, const char* source, int len, int levels) {
+int JNOParser::avail(JNOParser::JStruct& entry, const char* source, int len, int levels) {
     int i, j;
 
     void* memory = nullptr;
-    DataType arrayType;
-    DataType valueType;
+    JData arrayType;
+    JData valueType;
     JNode curNode;
 
     //Базовый случаи
@@ -371,7 +394,7 @@ int JNOParser::avail(JNOParser::_StructType& entry, const char* source, int len,
         if (levels > 0 && source[i] == syntax.array_segments[1]) break;
         i += skip(source + i, len - i);
         // check property name
-        if (!isProperty(source + j, i - j)) throw std::bad_exception();
+        if (!isProperty(source + j, i - j)) throw std::runtime_error("incorrect property name");
         curNode = {};
         curNode.propertyName.append(source + j, static_cast<size_t>(i - j));
         i += trim(source + i, len - i);  // trim string
@@ -383,7 +406,7 @@ int JNOParser::avail(JNOParser::_StructType& entry, const char* source, int len,
             ++levels;
             if (isArray(source + i, j, len - i)) {
                 j += i++;
-                arrayType = DataType::Unknown;
+                arrayType = JData::Unknown;
                 curNode.valueFlag = Node_ArrayFlag;
                 for (; i < j;) {
                     i += ignoreComment(source + i, j - i);
@@ -392,45 +415,45 @@ int JNOParser::avail(JNOParser::_StructType& entry, const char* source, int len,
                         ++i;
                     else {
                         i += Get_FormatType(source + i, &memory, valueType);
-                        if (valueType != DataType::Unknown) {
-                            if (arrayType == DataType::Unknown) {
+                        if (valueType != JData::Unknown) {
+                            if (arrayType == JData::Unknown) {
                                 arrayType = valueType;
 
                                 switch (arrayType) {
-                                    case DataType::String:
-                                        curNode.setMemory((void*)new std::vector<std::string>());
+                                    case JData::String:
+                                        curNode.setMemory((void*)new std::vector<jstring>());
                                         break;
-                                    case DataType::Boolean:
+                                    case JData::Boolean:
                                         curNode.setMemory((void*)new std::vector<bool>());
                                         break;
-                                    case DataType::Real:
+                                    case JData::Real:
                                         curNode.setMemory((void*)new std::vector<double>());
                                         break;
-                                    case DataType::Number:
+                                    case JData::Number:
                                         curNode.setMemory((void*)new std::vector<std::int64_t>());
                                         break;
                                 }
 
-                            } else if (arrayType != valueType && arrayType == DataType::Real && valueType != DataType::Number) {
+                            } else if (arrayType != valueType && arrayType == JData::Real && valueType != JData::Number) {
                                 throw std::runtime_error("Multi type is found.");
                             }
 
                             switch (arrayType) {
-                                case DataType::String: {
-                                    auto ref = (std::string*)memory;
-                                    ((std::vector<std::string>*)curNode.value)->emplace_back(*ref);
+                                case JData::String: {
+                                    auto ref = (jstring*)memory;
+                                    ((std::vector<jstring>*)curNode.value)->emplace_back(*ref);
                                     delete (ref);
                                     break;
                                 }
-                                case DataType::Boolean: {
+                                case JData::Boolean: {
                                     auto ref = (bool*)memory;
                                     ((std::vector<bool>*)curNode.value)->emplace_back(*ref);
                                     delete (ref);
                                     break;
                                 }
-                                case DataType::Real: {
+                                case JData::Real: {
                                     double* ref;
-                                    if (valueType == DataType::Number) {
+                                    if (valueType == JData::Number) {
                                         ref = new double(static_cast<double>(*(std::int64_t*)memory));
                                         delete ((std::int64_t*)memory);
                                     } else
@@ -440,7 +463,7 @@ int JNOParser::avail(JNOParser::_StructType& entry, const char* source, int len,
                                     delete (ref);
                                     break;
                                 }
-                                case DataType::Number: {
+                                case JData::Number: {
                                     auto ref = (std::int64_t*)memory;
                                     ((std::vector<std::int64_t>*)curNode.value)->emplace_back(*ref);
                                     delete (ref);
@@ -454,19 +477,19 @@ int JNOParser::avail(JNOParser::_StructType& entry, const char* source, int len,
 
                 // shrink to fit
                 switch (arrayType) {
-                    case DataType::String: {
-                        ((std::vector<std::string>*)curNode.value)->shrink_to_fit();
+                    case JData::String: {
+                        ((std::vector<jstring>*)curNode.value)->shrink_to_fit();
                         break;
                     }
-                    case DataType::Boolean: {
+                    case JData::Boolean: {
                         ((std::vector<bool>*)curNode.value)->shrink_to_fit();
                         break;
                     }
-                    case DataType::Real: {
+                    case JData::Real: {
                         ((std::vector<double>*)curNode.value)->shrink_to_fit();
                         break;
                     }
-                    case DataType::Number: {
+                    case JData::Number: {
                         ((std::vector<int64_t>*)curNode.value)->shrink_to_fit();
                         break;
                     }
@@ -475,7 +498,7 @@ int JNOParser::avail(JNOParser::_StructType& entry, const char* source, int len,
                 curNode.valueFlag |= (arrayType) << 2;
             } else {  // get the next node
                 ++i;
-                _StructType* _nodes = new _StructType;
+                JStruct* _nodes = new JStruct;
                 i += avail(*_nodes, source + i, len - i, levels);
                 curNode.valueFlag = Node_StructFlag;
                 curNode.setMemory(_nodes);
@@ -527,7 +550,7 @@ bool JNOParser::parse(const char* filename) {
     free(buf);
     return true;
 }
-bool JNOParser::parse(const std::string& filename) { return parse(filename.data()); }
+bool JNOParser::parse(const jstring& filename) { return parse(filename.data()); }
 
 bool JNOParser::Deserialize(const char* source, int len) {
     int i;
@@ -538,11 +561,11 @@ bool JNOParser::Deserialize(const char* source, int len) {
 #endif
     i = avail(entry, source, len);
 }
-std::string JNOParser::Serialize() {
-    std::string data{nullptr};
+jstring JNOParser::Serialize() {
+    jstring data{nullptr};
     return data;
 }
-JNode* JNOParser::GetNode(const std::string& name) {
+JNode* JNOParser::GetNode(const jstring& name) {
     JNode* node = nullptr;
     int id = stringToHash(name.c_str());
 
@@ -553,9 +576,9 @@ JNode* JNOParser::GetNode(const std::string& name) {
     return node;
 }
 
-JNOParser::_StructType& JNOParser::GetContainer() { return entry; }
+JNOParser::JStruct& JNOParser::GetContainer() { return entry; }
 
-JNode* JNOParser::FindNode(const std::string& nodePath) {
+JNode* JNOParser::FindNode(const jstring& nodePath) {
     JNode* node = nullptr;
     decltype(this->entry)* entry = &this->entry;
     decltype(entry->begin()) iter;
@@ -570,7 +593,7 @@ JNode* JNOParser::FindNode(const std::string& nodePath) {
             if (iter->second.isStruct())
                 entry = decltype(entry)(iter->second.value);
             else {
-                if (r == nodePath.length()) node = &iter->second;  // get the next section
+                if (r == static_cast<int>(nodePath.length())) node = &iter->second;  // get the next section
                 break;
             }
         }
@@ -580,10 +603,16 @@ JNode* JNOParser::FindNode(const std::string& nodePath) {
     } while (l < r);
     return node;
 }
-bool JNOParser::ContainsNode(const std::string& nodePath) { return FindNode(nodePath) != nullptr; }
+bool JNOParser::ContainsNode(const jstring& nodePath) { return FindNode(nodePath) != nullptr; }
 void JNOParser::Clear() {
     // todo: Free allocated data
-    _StructType* entr = &this->entry;
+    JStruct* entr = &this->entry;
     this->entry.clear();
+}
+
+jstring JNOParser::operator<<(std::iostream& ostream) {
+    jstring jstr;
+    jstr = Serialize();
+    return jstr;
 }
 }  // namespace jno
