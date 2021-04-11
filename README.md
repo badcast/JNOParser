@@ -3,6 +3,7 @@
 
 //Syntax    view 
 //Comment ...                 this is comment line 
+
 node_name                   //this is node name
 {                           //this is structure nodes
     property_name   "value"   //this is property name-property_name and "value"-value for property
