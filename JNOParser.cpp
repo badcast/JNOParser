@@ -1,11 +1,12 @@
 #include "JNOParser.hpp"
+
+#include <cmath>
 #include <cstdint>
+#include <cstring>
+#include <fstream>
 #include <memory>
 #include <stdexcept>
-#include <cstring>
-#include <cmath>
 #include <vector>
-#include <fstream>
 namespace jno {
 
 const struct {
@@ -92,19 +93,19 @@ static int go_end_line(const char* c, int len = INT32_MAX) {
 }
 
 static int Get_FormatType(const char* c, void** mem, DataType& out) {
-    int temp = 0;
+    int temp;
 
     if (mem) *mem = nullptr;
 
     // string type
     if (*c == syntax.format_string) {
-        ++temp;
+        temp = 1;
         for (; c[temp] != syntax.format_string; ++temp)
             if (c[temp] == syntax.left_seperator && c[temp + 1] == syntax.format_string) ++temp;
         --temp;
         if (temp) {
             if (mem) {
-                std::string str = std::string();
+                std::string str;
                 str.reserve(temp);
                 for (size_t i = 0; i < temp; ++i) {
                     if (c[i + 1] == syntax.left_seperator) ++i;
@@ -126,9 +127,10 @@ static int Get_FormatType(const char* c, void** mem, DataType& out) {
     } else if (is_bool(c, &temp)) {
         if (mem) *mem = new bool(temp == sizeof(syntax.true_string) - 1);
         out = DataType::Boolean;
-    } else
+    } else {
+        out = DataType::Unknown;
         temp = 0;
-
+    }
     return temp;
 }
 
@@ -177,7 +179,8 @@ inline int skip(const char* c, int len = INT32_MAX) {
 
 inline bool isProperty(const char* c, int len) {
     for (size_t i = 0; i < len; ++i)
-        if (!((toupper(c[i]) >= 'A' && toupper(c[i]) <= 'Z') || (i > 0 && is_number(c[i])) || c[i] == syntax.node_name_concqt)) return false;
+        if (!((toupper(c[i]) >= 'A' && toupper(c[i]) <= 'Z') || (i > 0 && is_number(c[i])) || c[i] == syntax.node_name_concqt))
+            return false;
     return len != 0;
 }
 
@@ -395,10 +398,10 @@ int JNOParser::avail(JNOParser::_StructType& entry, const char* source, int len,
 
                                 switch (arrayType) {
                                     case DataType::String:
-                                        curNode.setMemory((void*)new std::vector<std::string> ());
+                                        curNode.setMemory((void*)new std::vector<std::string>());
                                         break;
                                     case DataType::Boolean:
-                                        curNode.setMemory((void*)new std::vector<bool> ());
+                                        curNode.setMemory((void*)new std::vector<bool>());
                                         break;
                                     case DataType::Real:
                                         curNode.setMemory((void*)new std::vector<double>());
@@ -504,11 +507,14 @@ int JNOParser::avail(JNOParser::_StructType& entry, const char* source, int len,
 
     return i;
 }
-void JNOParser::Deserialize(const char* filename) {
+bool JNOParser::parse(const char* filename) {
     long sz;
     char* buf;
     std::ifstream file;
     file.open(filename);
+
+    if (!file.good()) return false;
+
     sz = file.seekg(0, std::ios::end).tellg();
     file.seekg(0, std::ios::beg);
 
@@ -519,9 +525,11 @@ void JNOParser::Deserialize(const char* filename) {
     file.close();
     Deserialize((char*)buf, sz);
     free(buf);
+    return true;
 }
-void JNOParser::Deserialize(const std::string& source) { Deserialize(source.data(), source.size()); }
-void JNOParser::Deserialize(const char* source, int len) {
+bool JNOParser::parse(const std::string& filename) { return parse(filename.data()); }
+
+bool JNOParser::Deserialize(const char* source, int len) {
     int i;
 
     Clear();
@@ -529,8 +537,6 @@ void JNOParser::Deserialize(const char* source, int len) {
     _dbgLastNode = nullptr;
 #endif
     i = avail(entry, source, len);
-
-    auto node = FindNode("first/ops/ps");
 }
 std::string JNOParser::Serialize() {
     std::string data{nullptr};
@@ -577,6 +583,7 @@ JNode* JNOParser::FindNode(const std::string& nodePath) {
 bool JNOParser::ContainsNode(const std::string& nodePath) { return FindNode(nodePath) != nullptr; }
 void JNOParser::Clear() {
     // todo: Free allocated data
+    _StructType* entr = &this->entry;
     this->entry.clear();
 }
-}  // namespace RoninEngine
+}  // namespace jno

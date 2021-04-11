@@ -76,12 +76,14 @@ class JNOParser {
     ~JNOParser() = default;
 
     ///Optimizing and recalculated. Return result size
-    std::size_t Defrag(); 
+    std::size_t defrag_memory();
+
+    bool is_defraged_memory();
     
-    void Deserialize(const char* filename);
-    void Deserialize(const std::string& source);
-    void Deserialize(const char* source, int len);
-    void deserialize(const std::string& content, int depth = -1);
+    bool parse(const char* filename);
+    bool parse(const std::string& filename);
+    bool Deserialize(const char* source, int len);
+    bool deserialize(const std::string& content, int depth = -1);
     std::string Serialize();
 
     // Find node
