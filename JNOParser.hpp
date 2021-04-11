@@ -4,34 +4,20 @@
 #include <string>
 #include <vector>
 
-namespace RoninEngine {
-static const struct {
-    char dot = '.';
-    char obstacle = ',';
-    char space = ' ';
-    char nodePathBreaker = '/';
-    char commentLine[3] = "//";
-    char left_seperator = '\\';
-    char eof_segment = '\n';
-    char format_string = '\"';
-    char true_string[5]{"true"};
-    char false_string[6]{"false"};
-    char array_segments[2]{'{', '}'};
-    char trim_segments[5]{' ', '\t', '\n', '\r', '\v'};
-} syntax;
+namespace jno {
 
-enum ObjectSerializedFormat { Normal, WithOut_EOF, WithOut_Tabs };
+enum JNOSyntaxFormat{ Normal, WithOut_EOF, WithOut_Tabs };
 
 constexpr int Node_ValueFlag = 1;
 constexpr int Node_ArrayFlag = 2;
 constexpr int Node_StructFlag = 3;
 
-class ObjectParser;
+class JNOParser;
 
 enum DataType { Unknown = 0, String = 1, Boolean = 2, Real = 3, Number = 4 };
 
-class ObjectNode {
-    friend class ObjectParser;
+class JNode {
+    friend class JNOParser;
     std::string propertyName;
     std::uint8_t valueFlag;
     void* value = 0;
@@ -47,12 +33,12 @@ class ObjectNode {
 #endif
 
    public:
-    ObjectNode() = default;
-    ObjectNode(const ObjectNode&);
+    JNode() = default;
+    JNode(const JNode&);
 
-    ObjectNode& operator=(const ObjectNode&);
+    JNode& operator=(const JNode&);
 
-    ~ObjectNode();
+    ~JNode();
 
     inline bool isArray();
     inline bool isStruct();
@@ -76,19 +62,22 @@ class ObjectNode {
     std::vector<bool>* toBooleans();
 };
 
-class ObjectParser {
+class JNOParser {
    public:
-    using _StructType = std::map<int, ObjectNode>;
+    using _StructType = std::map<int, JNode>;
 
    private:
     _StructType entry;
-    int avail(ObjectParser::_StructType& entry, const char* source, int len, int levels = 0);
+    int avail(JNOParser::_StructType& entry, const char* source, int len, int levels = 0);
 
    public:
-    ObjectParser();
-    ObjectParser(const ObjectParser&) = delete;
-    ~ObjectParser() = default;
+    JNOParser();
+    JNOParser(const JNOParser&) = delete;
+    ~JNOParser() = default;
 
+    ///Optimizing and recalculated. Return result size
+    std::size_t Defrag(); 
+    
     void Deserialize(const char* filename);
     void Deserialize(const std::string& source);
     void Deserialize(const char* source, int len);
@@ -96,15 +85,15 @@ class ObjectParser {
     std::string Serialize();
 
     // Find node
-    ObjectNode* GetNode(const std::string& name);
+    JNode* GetNode(const std::string& name);
 
     _StructType& GetContainer();
-    _StructType& GetContainer(ObjectNode* node);
+    _StructType& GetContainer(JNode* node);
 
     // Find node from child
     // example, key="First/Second/Triple" -> Node
     // for has a node, HasNode
-    ObjectNode* FindNode(const std::string& nodePath);
+    JNode* FindNode(const std::string& nodePath);
 
     bool ContainsNode(const std::string& nodePath);
 
