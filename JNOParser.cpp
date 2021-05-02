@@ -72,7 +72,7 @@ static bool is_real(const char* c, int* getLength) {
     bool real = false;
     if (getLength == nullptr) throw std::bad_exception();
     *getLength = 0;
-    for(;;){
+    for (;;) {
         if (!is_number(c[*getLength])) {
             if (real) break;
 
@@ -210,7 +210,7 @@ inline bool isSpace(char c) {
 }
 
 static bool isArray(const char* c, int& endpoint, int len = INT32_MAX) {
-    int i = 0;
+    int i;
     bool result = false;
 
     if (*c == syntax.array_segments[0]) {
@@ -220,7 +220,7 @@ static bool isArray(const char* c, int& endpoint, int len = INT32_MAX) {
         i += ignoreComment(c + i, len - i);
         i += trim(c + i);
         if (Has_DataType(c + i) || c[i] == syntax.array_segments[1]) {
-            for (; c[i] && i < len; ++i) {
+            for (i = 0; c[i] && i < len; ++i) {
                 if (c[i] == syntax.array_segments[0])
                     break;
                 else if (c[i] == syntax.array_segments[1]) {
@@ -370,16 +370,25 @@ jno::JNode::operator jstring() { return toString(); }
 
 jno::JNode::operator bool() { return toBoolean(); }
 
-JNOParser::JNOParser() {}
+jno::JNOParser::JNOParser() {}
+
+std::size_t JNOParser::defrag_require_memory(){
+    std::size_t _size = 0;
+    if(this->memory_ordering == nullptr)
+    {
+        JStruct* recur = &entry;
+        throw std::runtime_error("Memory is based");
+    }
+    return _size;
+}
 
 #ifdef DEBUG
 static JNode* _dbgLastNode;
 #endif
 
 // big algorithm, please free me.
-int JNOParser::avail(JNOParser::JStruct& entry, const char* source, int len, int levels) {
+int jno::JNOParser::avail(JNOParser::JStruct& entry, const char* source, int len, int levels) {
     int i, j;
-
     void* memory = nullptr;
     JData arrayType;
     JData valueType;
@@ -518,7 +527,7 @@ int JNOParser::avail(JNOParser::JStruct& entry, const char* source, int len, int
 
         entry.insert(std::make_pair(j = stringToHash(curNode.propertyName.c_str()), curNode));
 
-#if defined(QDEBUG) || defined(DEBUG)
+#if defined(G)
         // get iter
         auto _curIter = entry.find(j);
         if (_dbgLastNode) _dbgLastNode->nextNode = &_curIter->second;
@@ -556,7 +565,7 @@ bool JNOParser::Deserialize(const char* source, int len) {
     int i;
 
     Clear();
-#ifdef _DEBUG
+#ifdef DEBUG
     _dbgLastNode = nullptr;
 #endif
     i = avail(entry, source, len);
@@ -611,8 +620,6 @@ void JNOParser::Clear() {
 }
 
 jstring JNOParser::operator<<(std::iostream& ostream) {
-    jstring jstr;
-    jstr = Serialize();
-    return jstr;
+    return Serialize();
 }
 }  // namespace jno
