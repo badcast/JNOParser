@@ -1,6 +1,6 @@
 #include <iostream>
 
-#include "JNOParser.hpp"
+#include "../jnoparser.h"
 
 using namespace std;
 
