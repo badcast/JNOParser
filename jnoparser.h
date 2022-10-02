@@ -1,7 +1,7 @@
 #pragma once
 
 #include <map>
-#include <string>
+#include <cstring>
 #include <vector>
 #include <fstream>
 #include <stdexcept>
@@ -50,10 +50,10 @@ class jno_object_node {
     int decrementMemory();
     int incrementMemory();
 
-#ifdef NDEBUG
-    jno_object_node* prevNode = nullptr;
-    jno_object_node* nextNode = nullptr;
-#endif
+//#ifdef NDEBUG
+//    jno_object_node* prevNode = nullptr;
+//    jno_object_node* nextNode = nullptr;
+//#endif
 
    public:
     jno_object_node() = default;
@@ -71,19 +71,24 @@ class jno_object_node {
     inline bool isString();
     inline bool isBoolean();
 
+    jno_object_node* tree(const jstring& child);
+
     // Property name it is Node
     std::string& getPropertyName();
 
-    [[deprecated]]void set_native_memory(void* memory);
+    [[deprecated]] void set_native_memory(void* memory);
 
-    std::int64_t& toNumber();
-    double& toReal();
-    std::string& toString();
+    template<typename Type>
+    void writeNew(const Type& value);
+
+    jnumber& toNumber();
+    jreal& toReal();
+    jstring& toString();
+    std::vector<jreal>* toReals();
+    std::vector<jnumber>* toNumbers();
     bool& toBoolean();
-    std::vector<std::int64_t>* toNumbers();
-    std::vector<double>* toReals();
-    std::vector<std::string>* toStrings();
-    std::vector<bool>* toBooleans();
+    std::vector<jstring>* toStrings();
+    std::vector<jbool>* toBooleans();
 };
 
 class jno_object_parser {
@@ -104,17 +109,17 @@ class jno_object_parser {
     void deserialize(const std::string& source);
     void deserialize(const char* source, int len);
     void deserialize(const std::string& content, int depth = -1);
+
     std::string serialize();
 
     // Find node
     jno_object_node* at(const std::string& name);
 
     jstruct& get_struct();
-    jstruct& get_struct(jno_object_node* node);
 
-    // Find node from child
-    // example, key="First/Second/Triple" -> Node
-    // for has a node, HasNode
+    // Find node from childrens
+    // example, "First/Second/Triple" -> Node
+    // for has a node, contains method use.
     jno_object_node* find_node(const std::string& nodePath);
 
     // search node by name or prefix value, example
@@ -124,7 +129,13 @@ class jno_object_parser {
     jnumber occupied_memory();
 
     bool contains(const std::string& nodePath);
+
+    jno_object_node* tree(const jstring& child);
 };
+
+jno_object_node* operator<<(jno_object_node& root, const jstring& child);
+
+jno_object_node* operator<<(jno_object_parser& root, const jstring& child);
 
 int jno_string_to_hash(const char* str, int len = INT32_MAX);
 

@@ -1,7 +1,5 @@
 #include "jnoparser.h"
 
-
-
 namespace jno {
 
 enum { Node_ValueFlag = 1, Node_ArrayFlag = 2, Node_StructFlag = 3 };
@@ -99,7 +97,7 @@ int jno_format(const char* content, void** mem, JNOType& out) {
     } else if (jno_is_jbool(content, &offset)) {
         if (mem) *mem = jalloc<jbool>(offset == sizeof(jno_syntax.jno_true_string) - 1);
         out = JNOType::JNOBoolean;
-    } else // another type
+    } else  // another type
         offset = 0;
 
     return offset;
@@ -287,6 +285,11 @@ jbool jno_object_node::isReal() { return ((this->valueFlag & 0x1C) >> 2) == JNOT
 jbool jno_object_node::isString() { return ((this->valueFlag & 0x1C) >> 2) == JNOType::JNOString; }
 jbool jno_object_node::isBoolean() { return ((this->valueFlag & 0x1C) >> 2) == JNOType::JNOBoolean; }
 
+jno_object_node *jno_object_node::tree(const jstring &child)
+{
+
+}
+
 jstring& jno_object_node::getPropertyName() { return this->propertyName; }
 void jno_object_node::set_native_memory(void* memory) { this->_bits = memory; }
 jnumber& jno_object_node::toNumber() {
@@ -325,10 +328,6 @@ std::vector<jbool>* jno_object_node::toBooleans() {
 
 jno_object_parser::jno_object_parser() {}
 jno_object_parser::~jno_object_parser() {}
-
-#ifdef _DEBUG
-static ObjectNode* _dbgLastNode;
-#endif
 
 // big algorithm, please free me.
 int jno_object_parser::avail(jno_object_parser::jstruct& entry, const char* source, int len, int levels) {
@@ -472,7 +471,7 @@ int jno_object_parser::avail(jno_object_parser::jstruct& entry, const char* sour
         }
 
         entry.insert(std::make_pair(j = jno_string_to_hash(current_jno_node.propertyName.c_str()), current_jno_node));
-
+/*
 #if defined(QDEBUG) || defined(DEBUG)
         // get iter
         auto _curIter = entry.find(j);
@@ -480,6 +479,7 @@ int jno_object_parser::avail(jno_object_parser::jstruct& entry, const char* sour
         _curIter->second.prevNode = _dbgLastNode;
         _dbgLastNode = &_curIter->second;
 #endif
+*/
         i += jno_skip_comment(source + i, len - i);
     }
 
@@ -507,9 +507,6 @@ void jno_object_parser::deserialize(const jstring& source) { deserialize(source.
 void jno_object_parser::deserialize(const char* source, int len) {
     // FIXME: CLEAR FUNCTION IS UPGRADE
     entry.clear();  // clears alls
-#ifdef _DEBUG
-    _dbgLastNode = nullptr;
-#endif
     jno_object_parser::avail(entry, source, len);
 }
 jstring jno_object_parser::serialize() {
@@ -556,5 +553,12 @@ jno_object_node* jno_object_parser::find_node(const jstring& nodePath) {
     return node;
 }
 jbool jno_object_parser::contains(const jstring& nodePath) { return find_node(nodePath) != nullptr; }
+
+jno_object_node* operator<<(jno_object_node& root, const jstring& child) {
+    return root.tree(child);
+}
+jno_object_node* operator<<(jno_object_parser& root, const jstring& child) {
+    return root.tree(child);
+}
 
 }  // namespace jno
