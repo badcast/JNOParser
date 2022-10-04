@@ -8,21 +8,6 @@
 
 namespace jno {
 
-static const struct {
-    char jno_dot = '.';
-    char jno_obstacle = ',';
-    char jno_space = ' ';
-    char jno_nodePathBreaker = '/';
-    char jno_commentLine[3] = "//";
-    char jno_left_seperator = '\\';
-    char jno_eof_segment = '\n';
-    char jno_format_string = '\"';
-    char jno_true_string[5] = "true";
-    char jno_false_string[6] = "false";
-    char jno_array_segments[2]{'{', '}'};
-    char jno_trim_segments[5]{' ', '\t', '\n', '\r', '\v'};
-} jno_syntax;
-
 /// undefined type
 typedef void* jvariant;
 /// string type
@@ -105,7 +90,7 @@ class jno_object_parser {
     jno_object_parser(const jno_object_parser&) = delete;
     virtual ~jno_object_parser();
 
-    void deserialize(const char* filename);
+    void deserialize_from(const char* filename);
     void deserialize(const std::string& source);
     void deserialize(const char* source, int len);
     void deserialize(const std::string& content, int depth = -1);

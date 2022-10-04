@@ -8,8 +8,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 #stand up test
 enable_testing()
 
+include_directories(include)
+
 #if(BUILD_TESTING)
-    file(GLOB TARGET_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/*.hpp" "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp")
+    file(GLOB TARGET_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h" "${CMAKE_CURRENT_SOURCE_DIR}/include/*.cpp")
     add_library(JNOParser ${TARGET_SOURCES})
 
     target_include_directories(JNOParser INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})

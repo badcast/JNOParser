@@ -2,6 +2,22 @@
 
 namespace jno {
 
+static const struct {
+    char jno_dot = '.';
+    char jno_obstacle = ',';
+    char jno_space = ' ';
+    char jno_nodePathBreaker = '/';
+    char jno_commentLine[3] = "//";
+    char jno_left_seperator = '\\';
+    char jno_eof_segment = '\n';
+    char jno_format_string = '\"';
+    char jno_true_string[5] = "true";
+    char jno_false_string[6] = "false";
+    char jno_array_segments[2]{'{', '}'};
+    char jno_trim_segments[5]{' ', '\t', '\n', '\r', '\v'};
+} jno_syntax;
+
+
 enum { Node_ValueFlag = 1, Node_ArrayFlag = 2, Node_StructFlag = 3 };
 
 struct jno_evaluted {
@@ -12,30 +28,30 @@ struct jno_evaluted {
 };
 
 template <typename T>
-[[deprecated]] T* jalloc() {
+inline T* jalloc() {
     return RoninEngine::Runtime::GC::gc_alloc<T>();
 }
 
 template <typename T>
-[[deprecated]] T* jalloc(T* copy) {
+inline T* jalloc(T* copy) {
     return RoninEngine::Runtime::GC::gc_alloc<T>(copy);
 }
 
 template <typename T>
-[[deprecated]] T* jalloc(const T& copy) {
+inline T* jalloc(const T& copy) {
     return RoninEngine::Runtime::GC::gc_alloc<T>(copy);
 }
 
 template <typename T>
-[[deprecated]] void jfree(T* t) {
-    RoninEngine::Runtime::GC::gc_unalloc(t);
+inline void jfree(T* pointer) {
+    RoninEngine::Runtime::GC::gc_unalloc(pointer);
 }
 
-void jfree(void* t) { RoninEngine::Runtime::GC::gc_free(t); }
+inline void jfree(void* pointer) { std::free(pointer); }
 
 void jno_evaluate(jno_evaluted* file) {}
 
-jbool jno_is_jnumber(const char c) { return c >= '0' && c <= '9' || c == '-'; }
+jbool jno_is_jnumber(const char c) { return std::isdigit(c) || c == '-'; }
 
 jbool jno_is_jreal(const char* c, int* getLength) {
     *getLength = 0;
@@ -485,7 +501,7 @@ int jno_object_parser::avail(jno_object_parser::jstruct& entry, const char* sour
 
     return i;
 }
-void jno_object_parser::deserialize(const char* filename) {
+void jno_object_parser::deserialize_from(const char* filename) {
     long length;
     char* buffer;
 
