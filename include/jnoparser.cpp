@@ -24,24 +24,39 @@ static const struct {
 enum { Node_ValueFlag = 1, Node_ArrayFlag = 2, Node_StructFlag = 3 };
 
 struct jno_evaluated {
-    jnumber jstrings;
-    jnumber jnumbers;
-    jnumber jreals;
-    jnumber jbools;
-    jnumber jarrstrings;
-    jnumber jarrnumbers;
-    jnumber jarrreals;
-    jnumber jarrbools;
-    jnumber jdepths;
+    std::uint16_t jstrings;
+    std::uint32_t jstrings_total_bytes;
+    std::uint16_t jnumbers;
+    std::uint16_t jreals;
+    std::uint16_t jbools;
+    std::uint16_t jarrstrings;
+    std::uint32_t jarrstrings_total_bytes;
+    std::uint16_t jarrnumbers;
+    std::uint32_t jarrnumbers_total_bytes;
+    std::uint16_t jarrreals;
+    std::uint32_t jarrreals_total_bytes;
+    std::uint16_t jarrbools;
+    std::uint32_t jarrbools_total_bytes;
+    std::uint16_t jdepths;
 
-    jnumber magnitude() {
+    jnumber calcBytes() {
         jnumber sz = 0;
-        jnumber* pointer = reinterpret_cast<jnumber*>(this);
-        jnumber* end = reinterpret_cast<jnumber*>(reinterpret_cast<char*>(this) + sizeof(*this));
-        while (pointer != end) {
-            sz += *pointer;
-            ++pointer;
-        }
+
+        // calc jstring
+        sz += jstrings_total_bytes;
+
+        // calc jnumber
+        sz += jnumbers * sizeof(jnumber);
+
+        // calc jreals
+        sz += jreals * sizeof(jreal);
+
+        // calc jbools
+        sz += jbools * sizeof(jbool);
+
+        // calc arrays
+        sz += jarrstrings_total_bytes + jarrnumbers_total_bytes + jarrbools_total_bytes + jarrreals_total_bytes;
+
         return sz;
     }
 };
@@ -92,8 +107,8 @@ jbool jno_is_jreal(const char* content, int* getLength) {
 }
 
 jbool jno_is_jbool(const char* content, int* getLength) {
-    if (!memcmp(content, jno_syntax.jno_true_string, *getLength = sizeof(jno_syntax.jno_true_string) - 1)) return true;
-    if (!memcmp(content, jno_syntax.jno_false_string, *getLength = sizeof(jno_syntax.jno_false_string) - 1)) return true;
+    if (!strncmp(content, jno_syntax.jno_true_string, *getLength = sizeof(jno_syntax.jno_true_string) - 1)) return true;
+    if (!strncmp(content, jno_syntax.jno_false_string, *getLength = sizeof(jno_syntax.jno_false_string) - 1)) return true;
     *getLength = 0;
     return false;
 }
@@ -252,54 +267,6 @@ int jno_string_to_hash(const char* content, int contentLength) {
     return x;
 }
 
-jno_object_node::jno_object_node(const jno_object_node& copy) {
-    this->handle = copy.handle;
-    this->valueFlag = copy.valueFlag;
-    this->propertyName = copy.propertyName;
-    decrementMemory();
-    uses = copy.uses;
-    incrementMemory();
-    copy.uses = uses;
-}
-jno_object_node& jno_object_node::operator=(const jno_object_node& copy) {
-    this->handle = copy.handle;
-    this->valueFlag = copy.valueFlag;
-    this->propertyName = copy.propertyName;
-    decrementMemory();
-    uses = copy.uses;
-    incrementMemory();
-    copy.uses = uses;
-    ++*copy.uses;
-    return *this;
-}
-jno_object_node::~jno_object_node() {
-    if (!decrementMemory() && handle) {
-        if (isStruct()) {
-            jfree((jstruct*)handle);
-        } else if (isArray()) {
-            switch (valueFlag >> 2) {
-                case JNOType::JNOBoolean:
-                    jfree(toBooleans());
-                    break;
-                case JNOType::JNOString:
-                    jfree(toStrings());
-                    break;
-                case JNOType::JNONumber:
-                    jfree(toNumbers());
-                    break;
-                case JNOType::JNOReal:
-                    jfree(toReals());
-                    break;
-            }
-        } else if (isValue()) {
-            if (isString()) {
-                jfree((jstring*)handle);
-            } else
-                jfree(handle);
-        }
-    }
-}
-
 int jno_object_node::decrementMemory() {
     int res = 0;
     if (uses)
@@ -365,9 +332,7 @@ std::vector<jbool>* jno_object_node::toBooleans() {
 jno_object_parser::jno_object_parser() {}
 jno_object_parser::~jno_object_parser() {}
 
-int jno_avail_only(jno_evaluated& eval, const char* jno_source, int length, int depth){
-
-}
+int jno_avail_only(jno_evaluated& eval, const char* jno_source, int length, int depth) {}
 
 // big algorithm, please free me.
 // divide and conquer method avail
@@ -378,7 +343,7 @@ int jno_avail(jstruct& entry, jno_evaluated& eval, const char* jno_source, int l
     jno_object_node prototype_node;
     void* pointer;
 
-    //base step
+    // base step
     if (!length) return 0;
 
     for (x ^= x; x < length && jno_source[x];) {

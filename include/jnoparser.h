@@ -29,18 +29,9 @@ enum JNOType { Unknown = 0, JNOString = 1, JNOBoolean = 2, JNOReal = 3, JNONumbe
 
 class jno_object_node {
     friend class jno_object_parser;
+    void* handle = nullptr;
     std::string propertyName;
     std::uint8_t valueFlag;
-    void* handle = nullptr;
-    mutable int* uses = nullptr;
-
-    int decrementMemory();
-    int incrementMemory();
-
-    //#ifdef NDEBUG
-    //    jno_object_node* prevNode = nullptr;
-    //    jno_object_node* nextNode = nullptr;
-    //#endif
 
    public:
     jno_object_node() = default;
@@ -50,6 +41,9 @@ class jno_object_node {
 
     ~jno_object_node();
 
+    inline JNOType type();
+
+    [[deprecated]]
     inline bool isArray();
     inline bool isStruct();
     inline bool isValue();
