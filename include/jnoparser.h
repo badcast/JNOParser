@@ -7,6 +7,8 @@
 #include <stdexcept>
 
 namespace jno {
+class jno_object_parser;
+class jno_object_node;
 
 /// undefined type
 typedef void* jvariant;
@@ -19,9 +21,9 @@ typedef double jreal;
 /// logical type
 typedef bool jbool;
 
-enum JNOSerializedFormat { JNOBeautify, JNOCompact };
+using jstruct = std::map<int, jno_object_node>;
 
-class jno_object_parser;
+enum JNOSerializedFormat { JNOBeautify, JNOCompact };
 
 enum JNOType { Unknown = 0, JNOString = 1, JNOBoolean = 2, JNOReal = 3, JNONumber = 4 };
 
@@ -29,7 +31,7 @@ class jno_object_node {
     friend class jno_object_parser;
     std::string propertyName;
     std::uint8_t valueFlag;
-    void* _bits = nullptr;
+    void* handle = nullptr;
     mutable int* uses = nullptr;
 
     int decrementMemory();
@@ -40,7 +42,7 @@ class jno_object_node {
     //    jno_object_node* nextNode = nullptr;
     //#endif
 
-public:
+   public:
     jno_object_node() = default;
     jno_object_node(const jno_object_node&);
 
@@ -63,7 +65,7 @@ public:
 
     [[deprecated]] void set_native_memory(void* memory);
 
-    template<typename Type>
+    template <typename Type>
     void writeNew(const Type& value);
 
     jnumber& toNumber();
@@ -77,15 +79,12 @@ public:
 };
 
 class jno_object_parser {
-public:
-    using jstruct = std::map<int, jno_object_node>;
-
-private:
+   public:
+   private:
     void* _storage;
     jstruct entry;
-    int avail(jstruct& entry, const char* source, int len, int levels = 0);
 
-public:
+   public:
     jno_object_parser();
     jno_object_parser(const jno_object_parser&) = delete;
     virtual ~jno_object_parser();
