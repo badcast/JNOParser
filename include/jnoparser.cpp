@@ -1,3 +1,6 @@
+#include <cstdlib>
+#include <limits>
+
 #include "jnoparser.h"
 
 namespace jno {
@@ -17,7 +20,6 @@ static const struct {
     char jno_trim_segments[5]{' ', '\t', '\n', '\r', '\v'};
 } jno_syntax;
 
-
 enum { Node_ValueFlag = 1, Node_ArrayFlag = 2, Node_StructFlag = 3 };
 
 struct jno_evaluted {
@@ -25,29 +27,48 @@ struct jno_evaluted {
     jnumber jnumbers;
     jnumber jreals;
     jnumber jbools;
+    jnumber jarrstrings;
+    jnumber jarrnumbers;
+    jnumber jarrreals;
+    jnumber jarrbools;
+
+    jnumber magnitude(){
+        jnumber sz = 0;
+        jnumber* pointer = reinterpret_cast<jnumber*>(this);
+        jnumber* end = reinterpret_cast<jnumber*>(reinterpret_cast<char*>(this) + sizeof(*this));
+        while(pointer != end){
+            sz += *pointer;
+            ++pointer;
+        }
+        return sz;
+    }
 };
 
 template <typename T>
 inline T* jalloc() {
-    return RoninEngine::Runtime::GC::gc_alloc<T>();
-}
-
-template <typename T>
-inline T* jalloc(T* copy) {
-    return RoninEngine::Runtime::GC::gc_alloc<T>(copy);
+    return new T();//static_cast<T*>(std::malloc(sizeof(T)));//RoninEngine::Runtime::GC::gc_alloc<T>();
 }
 
 template <typename T>
 inline T* jalloc(const T& copy) {
-    return RoninEngine::Runtime::GC::gc_alloc<T>(copy);
+    T* ptr = static_cast<T*>(std::malloc(sizeof(T)));//RoninEngine::Runtime::GC::gc_alloc<T>(copy);
+    std::memcpy(ptr, &copy, sizeof(T));
+    return ptr;
 }
 
 template <typename T>
 inline void jfree(T* pointer) {
-    RoninEngine::Runtime::GC::gc_unalloc(pointer);
+    delete pointer;
+   // RoninEngine::Runtime::GC::gc_unalloc(pointer);
 }
 
 inline void jfree(void* pointer) { std::free(pointer); }
+
+jno_evaluted jno_analize(jno_object_parser* parser){
+    jno_evaluted eval = {};
+
+    return eval;
+}
 
 void jno_evaluate(jno_evaluted* file) {}
 
@@ -89,10 +110,9 @@ int jno_format(const char* content, void** mem, JNOType& out) {
         for (; content[offset] != jno_syntax.jno_format_string; ++offset)
             if (content[offset] == jno_syntax.jno_left_seperator && content[offset + 1] == jno_syntax.jno_format_string)
                 ++offset;
-        --offset;
-        if (offset) {
+        if (--offset) {
             if (mem) {
-                jstring str = jstring();
+                jstring str;
                 str.reserve(offset);
                 for (size_t i = 0; i < offset; ++i) {
                     if (content[i + 1] == jno_syntax.jno_left_seperator) ++i;
@@ -303,7 +323,7 @@ jbool jno_object_node::isBoolean() { return ((this->valueFlag & 0x1C) >> 2) == J
 
 jno_object_node *jno_object_node::tree(const jstring &child)
 {
-
+    return nullptr;
 }
 
 jstring& jno_object_node::getPropertyName() { return this->propertyName; }
@@ -508,6 +528,10 @@ void jno_object_parser::deserialize_from(const char* filename) {
     std::ifstream file;
 
     file.open(filename);
+
+    if(!file)
+        throw std::runtime_error("error open file");
+
     length = file.seekg(0, std::ios::end).tellg();
     file.seekg(0, std::ios::beg);
 
@@ -541,6 +565,10 @@ jno_object_node* jno_object_parser::at(const jstring& name) {
     return node;
 }
 
+jno_object_node* jno_object_parser::tree(const jstring& nodename) {
+    return at(nodename);
+}
+
 jno_object_parser::jstruct& jno_object_parser::get_struct() { return entry; }
 
 jno_object_node* jno_object_parser::find_node(const jstring& nodePath) {
@@ -562,19 +590,20 @@ jno_object_node* jno_object_parser::find_node(const jstring& nodePath) {
                 break;
             }
         }
-        l = r + 1;
+        l = ++r;
         r = nodePath.length();
 
     } while (l < r);
     return node;
 }
+
 jbool jno_object_parser::contains(const jstring& nodePath) { return find_node(nodePath) != nullptr; }
 
-jno_object_node* operator<<(jno_object_node& root, const jstring& child) {
-    return root.tree(child);
+jno_object_node& operator<<(jno_object_node& root, const jstring& nodename) {
+    return *root.tree(nodename);
 }
-jno_object_node* operator<<(jno_object_parser& root, const jstring& child) {
-    return root.tree(child);
+jno_object_node& operator<<(jno_object_parser& root, const jstring& nodename) {
+    return *root.tree(nodename);
 }
 
 }  // namespace jno

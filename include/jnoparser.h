@@ -35,12 +35,12 @@ class jno_object_node {
     int decrementMemory();
     int incrementMemory();
 
-//#ifdef NDEBUG
-//    jno_object_node* prevNode = nullptr;
-//    jno_object_node* nextNode = nullptr;
-//#endif
+    //#ifdef NDEBUG
+    //    jno_object_node* prevNode = nullptr;
+    //    jno_object_node* nextNode = nullptr;
+    //#endif
 
-   public:
+public:
     jno_object_node() = default;
     jno_object_node(const jno_object_node&);
 
@@ -77,15 +77,15 @@ class jno_object_node {
 };
 
 class jno_object_parser {
-   public:
+public:
     using jstruct = std::map<int, jno_object_node>;
 
-   private:
+private:
     void* _storage;
     jstruct entry;
     int avail(jstruct& entry, const char* source, int len, int levels = 0);
 
-   public:
+public:
     jno_object_parser();
     jno_object_parser(const jno_object_parser&) = delete;
     virtual ~jno_object_parser();
@@ -118,9 +118,9 @@ class jno_object_parser {
     jno_object_node* tree(const jstring& child);
 };
 
-jno_object_node* operator<<(jno_object_node& root, const jstring& child);
+jno_object_node& operator<<(jno_object_node& root, const jstring& nodename);
 
-jno_object_node* operator<<(jno_object_parser& root, const jstring& child);
+jno_object_node& operator<<(jno_object_parser& root, const jstring& nodename);
 
 int jno_string_to_hash(const char* str, int len = INT32_MAX);
 
