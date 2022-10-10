@@ -10,11 +10,7 @@ enable_testing()
 
 include_directories(include)
 
-#if(BUILD_TESTING)
-    file(GLOB TARGET_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h" "${CMAKE_CURRENT_SOURCE_DIR}/include/*.cpp")
-    add_library(JNOParser ${TARGET_SOURCES})
-
-    target_include_directories(JNOParser INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
-    add_subdirectory(jnotest)
-#endif()
-
+file(GLOB TARGET_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h" "${CMAKE_CURRENT_SOURCE_DIR}/include/*.cpp")
+add_library(jnolib ${TARGET_SOURCES})
+target_include_directories(jnolib INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
+add_subdirectory(jnotest)

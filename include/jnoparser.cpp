@@ -3,6 +3,8 @@
 
 #include "jnoparser.h"
 
+#define method
+
 namespace jno {
 
 static const struct {
@@ -23,6 +25,24 @@ static const struct {
 
 enum { Node_ValueFlag = 1, Node_ArrayFlag = 2, Node_StructFlag = 3 };
 
+// NOTE: storage description
+
+struct jno_storage {
+    // up members: meta-info
+    int numProperties;
+    int numNumbers;
+    int numReals;
+    int numBools;
+    int numStrings;
+    int _properties;
+    int _numbers;
+    int _reals;
+    int _bools;
+    int _strings;
+    // next members: data
+    void* _members;
+};
+
 struct jno_evaluated {
     std::uint16_t jstrings;
     std::uint32_t jstrings_total_bytes;
@@ -40,7 +60,9 @@ struct jno_evaluated {
     std::uint16_t jdepths;
 
     jnumber calcBytes() {
-        jnumber sz = 0;
+        jnumber sz;
+
+        sz ^= sz;
 
         // calc jstring
         sz += jstrings_total_bytes;
@@ -81,17 +103,15 @@ inline void jfree(T* pointer) {
 
 inline void jfree(void* pointer) { std::free(pointer); }
 
-jno_evaluated jno_analize(jno_object_parser* parser) {
+method jno_evaluated jno_analize(jno_object_parser* parser) {
     jno_evaluated eval = {};
 
     return eval;
 }
 
-void jno_evaluate(jno_evaluated* file) {}
+method bool jno_is_jnumber(const char character) { return std::isdigit(character) || character == '-'; }
 
-jbool jno_is_jnumber(const char character) { return std::isdigit(character) || character == '-'; }
-
-jbool jno_is_jreal(const char* content, int* getLength) {
+method jbool jno_is_jreal(const char* content, int* getLength) {
     bool real = false;
     for (;;) {
         if (!jno_is_jnumber(content[*getLength])) {
@@ -106,19 +126,17 @@ jbool jno_is_jreal(const char* content, int* getLength) {
     return real;
 }
 
-jbool jno_is_jbool(const char* content, int* getLength) {
+method inline jbool jno_is_jbool(const char* content, int* getLength) {
     if (!strncmp(content, jno_syntax.jno_true_string, *getLength = sizeof(jno_syntax.jno_true_string) - 1)) return true;
     if (!strncmp(content, jno_syntax.jno_false_string, *getLength = sizeof(jno_syntax.jno_false_string) - 1)) return true;
-    *getLength = 0;
+    *getLength ^= *getLength;
     return false;
 }
 
-int jno_format(const char* content, void** mem, JNOType& out) {
+method int jno_get_format(const char* content, void** mem, JNOType& out) {
     int offset = 0;
 
     out = JNOType::Unknown;
-
-    if (mem) *mem = nullptr;
 
     // string type
     if (*content == jno_syntax.jno_format_string) {
@@ -154,13 +172,13 @@ int jno_format(const char* content, void** mem, JNOType& out) {
     return offset;
 }
 
-jbool jno_has_datatype(const char* content) {
+method inline jbool jno_has_datatype(const char* content) {
     JNOType type;
-    jno_format(const_cast<char*>(content), nullptr, type);
+    jno_get_format(const_cast<char*>(content), nullptr, type);
     return type != JNOType::Unknown;
 }
 
-int jno_trim(const char* content, int contentLength = std::numeric_limits<int>::max()) {
+method int jno_trim(const char* content, int contentLength = std::numeric_limits<int>::max()) {
     int i = 0, j;
     if (content != nullptr)
         for (; i < contentLength && content[i];) {
@@ -177,28 +195,28 @@ int jno_trim(const char* content, int contentLength = std::numeric_limits<int>::
     return i;
 }
 
-int jno_skip(const char* c, int len = std::numeric_limits<int>::max()) {
-    int i, j;
+method int jno_skip(const char* c, int len = std::numeric_limits<int>::max()) {
+    int x, y;
     char skipping[sizeof(jno_syntax.jno_trim_segments) + sizeof(jno_syntax.jno_array_segments)];
-    skipping[0] = '\0';
+    *skipping ^= *skipping;
     strncpy(skipping, jno_syntax.jno_trim_segments, sizeof(jno_syntax.jno_trim_segments));
     strncpy(skipping + sizeof jno_syntax.jno_trim_segments, jno_syntax.jno_array_segments,
             sizeof(jno_syntax.jno_array_segments));
-    for (i = 0; c[i] && i <= len;) {
-        for (j = 0; j < sizeof(skipping);)
-            if (c[i] == skipping[j])
+    for (x ^= x; c[x] && x <= len;) {
+        for (y ^= y; y < sizeof(skipping);)
+            if (c[x] == skipping[y])
                 break;
             else
-                ++j;
-        if (j == sizeof(skipping))
-            ++i;
+                ++y;
+        if (y == sizeof(skipping))
+            ++x;
         else
             break;
     }
-    return i;
+    return x;
 }
 
-jbool jno_is_property(const char* abstractContent, int len) {
+method inline jbool jno_is_property(const char* abstractContent, int len) {
     int x;
     for (x ^= x; x < len; ++x, ++abstractContent)
         if (!((*abstractContent >= 'A' && *abstractContent <= 'z') ||
@@ -208,18 +226,18 @@ jbool jno_is_property(const char* abstractContent, int len) {
     return len != 0;
 }
 
-jbool jno_is_comment_line(const char* c, int len) {
+method inline jbool jno_is_comment_line(const char* c, int len) {
     return len > 0 && !strncmp(c, jno_syntax.jno_commentLine, std::min(2, len));
 }
 
-int jno_move_eof(const char* c, int len = std::numeric_limits<int>::max()) {
-    int i = 0;
-    for (; c[i] && i < len && c[i] != jno_syntax.jno_eof_segment; ++i)
+method inline int jno_move_eof(const char* c, int len = std::numeric_limits<int>::max()) {
+    int i;
+    for (i ^= i; c[i] && i < len && c[i] != jno_syntax.jno_eof_segment; ++i)
         ;
     return i;
 }
 
-int jno_skip_comment(const char* c, int len) {
+method inline int jno_skip_comment(const char* c, int len) {
     int i = jno_trim(c, len);
     while (jno_is_comment_line(c + i, len - i)) {
         i += jno_move_eof(c + i, len - i);
@@ -228,13 +246,15 @@ int jno_skip_comment(const char* c, int len) {
     return i;
 }
 
-jbool jno_is_space(char c) {
-    for (int i = 0; i <= sizeof(jno_syntax.jno_trim_segments); ++i)
-        if (jno_syntax.jno_trim_segments[i] == c) return true;
+method inline jbool jno_is_space(const char c) {
+    const char* left = jno_syntax.jno_trim_segments;
+    const char* right = left + sizeof(jno_syntax.jno_trim_segments);
+    for (; left < right; ++left)
+        if (*left == c) return true;
     return false;
 }
 
-jbool jno_is_array(const char* content, int& endpoint, int contentLength = std::numeric_limits<int>::max()) {
+method jbool jno_is_array(const char* content, int& endpoint, int contentLength = std::numeric_limits<int>::max()) {
     int i = 0;
     jbool result = false;
 
@@ -260,86 +280,257 @@ jbool jno_is_array(const char* content, int& endpoint, int contentLength = std::
     return result;
 }
 
-int jno_string_to_hash(const char* content, int contentLength) {
+method inline int jno_string_to_hash(const char* content, int contentLength) {
     int x = 1;
-    int y = 0;
-    while (*(content + y) && y < contentLength) x *= (int)*(content + y++);
+    int y;
+    y ^= y;
+    while (*(content) && y++ < contentLength) x *= *(content);
     return x;
 }
 
-int jno_object_node::decrementMemory() {
-    int res = 0;
-    if (uses)
-        if (!(res = --(*uses))) {
-            res = *uses;
-            jfree(uses);
-        }
-    uses = nullptr;
-    return res;
-}
+method jbool jno_object_node::isValue() { return (this->flags & 3) == Node_ValueFlag; }
 
-int jno_object_node::incrementMemory() {
-    if (!uses) uses = jalloc<int>();
-    return ++*uses;
-}
+method jbool jno_object_node::isArray() { return (this->flags & 3) == Node_ArrayFlag; }
 
-jbool jno_object_node::isValue() { return (this->valueFlag & 3) == Node_ValueFlag; }
-jbool jno_object_node::isArray() { return (this->valueFlag & 3) == Node_ArrayFlag; }
-jbool jno_object_node::isStruct() { return (this->valueFlag & 3) == Node_StructFlag; }
-jbool jno_object_node::isNumber() { return ((this->valueFlag & 0x1C) >> 2) == JNOType::JNONumber; }
-jbool jno_object_node::isReal() { return ((this->valueFlag & 0x1C) >> 2) == JNOType::JNOReal; }
-jbool jno_object_node::isString() { return ((this->valueFlag & 0x1C) >> 2) == JNOType::JNOString; }
-jbool jno_object_node::isBoolean() { return ((this->valueFlag & 0x1C) >> 2) == JNOType::JNOBoolean; }
+method jbool jno_object_node::isStruct() { return (this->flags & 3) == Node_StructFlag; }
 
-jno_object_node* jno_object_node::tree(const jstring& child) { return nullptr; }
+method jbool jno_object_node::isNumber() { return ((this->flags & 0x1C) >> 2) == JNOType::JNONumber; }
 
-jstring& jno_object_node::getPropertyName() { return this->propertyName; }
-void jno_object_node::set_native_memory(void* memory) { this->handle = memory; }
-jnumber& jno_object_node::toNumber() {
+method jbool jno_object_node::isReal() { return ((this->flags & 0x1C) >> 2) == JNOType::JNOReal; }
+
+method jbool jno_object_node::isString() { return ((this->flags & 0x1C) >> 2) == JNOType::JNOString; }
+
+method jbool jno_object_node::isBoolean() { return ((this->flags & 0x1C) >> 2) == JNOType::JNOBoolean; }
+
+method jno_object_node* jno_object_node::tree(const jstring& child) { return nullptr; }
+
+method jstring& jno_object_node::getPropertyName() { return this->propertyName; }
+
+method void jno_object_node::set_native_memory(void* memory) { this->handle = memory; }
+
+method jnumber& jno_object_node::toNumber() {
     if (!isNumber()) throw std::bad_cast();
-
     return *(jnumber*)this->handle;
 }
-jreal& jno_object_node::toReal() {
+method jreal& jno_object_node::toReal() {
     if (!isReal()) throw std::bad_cast();
     return *(jreal*)this->handle;
 }
-jstring& jno_object_node::toString() {
+method jstring& jno_object_node::toString() {
     if (!isString()) throw std::bad_cast();
     return *(jstring*)this->handle;
 }
-jbool& jno_object_node::toBoolean() {
+method jbool& jno_object_node::toBoolean() {
     if (!isBoolean()) throw std::bad_cast();
     return *(jbool*)this->handle;
 }
-std::vector<jnumber>* jno_object_node::toNumbers() {
-    if (!isArray() && (valueFlag >> 2) != JNOType::JNONumber) throw std::bad_cast();
+method std::vector<jnumber>* jno_object_node::toNumbers() {
+    if (!isArray() && (flags >> 2) != JNOType::JNONumber) throw std::bad_cast();
     return (std::vector<jnumber>*)handle;
 }
-std::vector<jreal>* jno_object_node::toReals() {
-    if (!isArray() && (valueFlag >> 2) != JNOType::JNOReal) throw std::bad_cast();
+method std::vector<jreal>* jno_object_node::toReals() {
+    if (!isArray() && (flags >> 2) != JNOType::JNOReal) throw std::bad_cast();
     return (std::vector<jreal>*)handle;
 }
-std::vector<jstring>* jno_object_node::toStrings() {
-    if (!isArray() && (valueFlag >> 2) != JNOType::JNOString) throw std::bad_cast();
+method std::vector<jstring>* jno_object_node::toStrings() {
+    if (!isArray() && (flags >> 2) != JNOType::JNOString) throw std::bad_cast();
     return (std::vector<jstring>*)handle;
 }
-std::vector<jbool>* jno_object_node::toBooleans() {
-    if (!isArray() && (valueFlag >> 2) != JNOType::JNOBoolean) throw std::bad_cast();
+method std::vector<jbool>* jno_object_node::toBooleans() {
+    if (!isArray() && (flags >> 2) != JNOType::JNOBoolean) throw std::bad_cast();
     return (std::vector<jbool>*)handle;
 }
 
-jno_object_parser::jno_object_parser() {}
-jno_object_parser::~jno_object_parser() {}
+method jno_object_parser::jno_object_parser() {}
 
-int jno_avail_only(jno_evaluated& eval, const char* jno_source, int length, int depth) {}
+method jno_object_parser::~jno_object_parser() {}
 
-// big algorithm, please free me.
-// divide and conquer method avail
-int jno_avail(jstruct& entry, jno_evaluated& eval, const char* jno_source, int length, int depth) {
+method int jno_avail_only(jno_evaluated& eval, const char* jno_source, int length, int depth) {
     int x, y;
     JNOType valueType;
     JNOType current_block_type;
+
+    // base step
+    if (!length) return 0;
+
+    for (x ^= x; x < length && jno_source[x];) {
+        // has comment line
+        y = x += jno_skip_comment(jno_source + x, length - x);
+        if (depth > 0 && jno_source[x] == jno_syntax.jno_array_segments[1]) break;
+        x += jno_skip(jno_source + x, length - x);
+        // check property name
+        if (!jno_is_property(jno_source + y, x - y)) throw std::bad_exception();
+
+        // property name
+        // prototype_node.propertyName.append(jno_source + y, static_cast<size_t>(x - y));
+
+        //  has comment line
+        x += jno_skip_comment(jno_source + x, length - x);
+        x += jno_trim(jno_source + x, length - x);  // trim string
+        // is block or array
+        if (jno_source[x] == *jno_syntax.jno_array_segments) {
+            ++depth;
+            if (jno_is_array(jno_source + x, y, length - x)) {
+                y += x++;
+                current_block_type = JNOType::Unknown;
+                prototype_node.flags = Node_ArrayFlag;
+                for (; x < y;) {
+                    x += jno_skip_comment(jno_source + x, y - x);
+                    // next index
+                    if (jno_source[x] == jno_syntax.jno_obstacle)
+                        ++x;
+                    else {
+                        x += jno_get_format(jno_source + x, nullptr, valueType);
+
+                        // JNO current value Type
+
+                        if (valueType != JNOType::Unknown) {
+                            if (current_block_type == JNOType::Unknown) {
+                                current_block_type = valueType;
+
+                                switch (current_block_type) {
+                                    case JNOType::JNOString:
+                                        ++eval.jarrstrings;
+                                        // prototype_node.set_native_memory((void*)jalloc<std::vector<jstring>>());
+                                        break;
+                                    case JNOType::JNOBoolean:
+                                        ++eval.jarrbools;
+                                        // prototype_node.set_native_memory((void*)jalloc<std::vector<jbool>>());
+                                        break;
+                                    case JNOType::JNOReal:
+                                        ++eval.jarrreals;
+                                        // prototype_node.set_native_memory((void*)jalloc<std::vector<jreal>>());
+                                        break;
+                                    case JNOType::JNONumber:
+                                        ++eval.jarrnumbers;
+                                        // prototype_node.set_native_memory((void*)jalloc<std::vector<jnumber>>());
+                                        break;
+                                }
+
+                            } else if (current_block_type != valueType && current_block_type == JNOType::JNOReal &&
+                                       valueType != JNOType::JNONumber) {
+                                throw std::runtime_error("Multi type is found.");
+                            }
+
+                            switch (current_block_type) {
+                                case JNOType::JNOString: {
+                                    auto ref = (jstring*)pointer;
+                                    ((std::vector<jstring>*)prototype_node.handle)->emplace_back(*ref);
+                                    // jfree(ref);
+                                    break;
+                                }
+                                case JNOType::JNOBoolean: {
+                                    auto ref = (jbool*)pointer;
+                                    ((std::vector<jbool>*)prototype_node.handle)->emplace_back(*ref);
+                                    // jfree(ref);
+                                    break;
+                                }
+                                case JNOType::JNOReal: {
+                                    jreal* ref;
+                                    if (valueType == JNOType::JNONumber) {
+                                        ref = new jreal(static_cast<jreal>(*(jnumber*)pointer));
+                                        jfree((jnumber*)pointer);
+                                    } else
+                                        ref = (jreal*)pointer;
+
+                                    ((std::vector<jreal>*)prototype_node.handle)->emplace_back(*ref);
+                                    jfree(ref);
+                                    break;
+                                }
+                                case JNOType::JNONumber: {
+                                    auto ref = (jnumber*)pointer;
+                                    ((std::vector<jnumber>*)prototype_node.handle)->emplace_back(*ref);
+                                    jfree(ref);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    x += jno_skip_comment(jno_source + x, y - x);
+                }
+
+                // shrink to fit
+                switch (current_block_type) {
+                    case JNOType::JNOString: {
+                        ((std::vector<jstring>*)prototype_node.handle)->shrink_to_fit();
+                        break;
+                    }
+                    case JNOType::JNOBoolean: {
+                        ((std::vector<jbool>*)prototype_node.handle)->shrink_to_fit();
+                        break;
+                    }
+                    case JNOType::JNOReal: {
+                        ((std::vector<jreal>*)prototype_node.handle)->shrink_to_fit();
+                        break;
+                    }
+                    case JNOType::JNONumber: {
+                        ((std::vector<jnumber>*)prototype_node.handle)->shrink_to_fit();
+                        break;
+                    }
+                }
+
+                prototype_node.flags |= (current_block_type) << 2;
+            } else {  // get the next node
+                ++x;
+                x += jno_avail_only(eval, jno_source + x, length - x, depth);
+                x += jno_skip_comment(jno_source + x, length - x);
+            }
+            --depth;
+            if (jno_source[x] != jno_syntax.jno_array_segments[1]) {
+                throw std::bad_exception();
+            }
+            ++x;
+        } else {  // get also value
+            x += jno_get_format(jno_source + x, nullptr, valueType);
+
+            switch (valueType) {
+                case JNOType::JNOString:
+                    ++eval.jstrings;
+                    break;
+                case JNOType::JNOBoolean:
+                    ++eval.jbools;
+                    break;
+                case JNOType::JNOReal:
+                    ++eval.jreals;
+                    break;
+                case JNOType::JNONumber:
+                    ++eval.jnumbers;
+                    break;
+            }
+
+            // prototype_node.set_native_memory(pointer);
+            // pointer = nullptr;
+            // prototype_node.flags = Node_ValueFlag | valueType << 2;
+        }
+
+        //entry.insert(std::make_pair(y = jno_string_to_hash(prototype_node.propertyName.c_str()), prototype_node));
+
+        /*
+        #if defined(QDEBUG) || defined(DEBUG)
+                // get iter
+                auto _curIter = entry.find(j);
+                if (_dbgLastNode) _dbgLastNode->nextNode = &_curIter->second;
+                _curIter->second.prevNode = _dbgLastNode;
+                _dbgLastNode = &_curIter->second;
+        #endif
+        */
+        x += jno_skip_comment(jno_source + x, length - x);
+    }
+
+    return x;
+}
+
+// big algorithm, please free me.
+// divide and conquer method avail
+method int jno_avail(jstruct& entry, jno_evaluated& eval, const char* jno_source, int length, int depth) {
+    int x, y;
+    JNOType valueType;
+    JNOType current_block_type;
+    struct propery_node {
+        jstring propertyName;
+        void* data;
+    };
+
     jno_object_node prototype_node;
     void* pointer;
 
@@ -355,24 +546,23 @@ int jno_avail(jstruct& entry, jno_evaluated& eval, const char* jno_source, int l
         if (!jno_is_property(jno_source + y, x - y)) throw std::bad_exception();
         prototype_node = {};
         prototype_node.propertyName.append(jno_source + y, static_cast<size_t>(x - y));
-        x += jno_trim(jno_source + x, length - x);  // trim string
         // has comment line
         x += jno_skip_comment(jno_source + x, length - x);
         x += jno_trim(jno_source + x, length - x);  // trim string
         // is block or array
-        if (jno_source[x] == jno_syntax.jno_array_segments[0]) {
+        if (jno_source[x] == *jno_syntax.jno_array_segments) {
             ++depth;
             if (jno_is_array(jno_source + x, y, length - x)) {
                 y += x++;
                 current_block_type = JNOType::Unknown;
-                prototype_node.valueFlag = Node_ArrayFlag;
+                prototype_node.flags = Node_ArrayFlag;
                 for (; x < y;) {
                     x += jno_skip_comment(jno_source + x, y - x);
                     // next index
                     if (jno_source[x] == jno_syntax.jno_obstacle)
                         ++x;
                     else {
-                        x += jno_format(jno_source + x, &pointer, valueType);
+                        x += jno_get_format(jno_source + x, &pointer, valueType);
                         if (valueType != JNOType::Unknown) {
                             if (current_block_type == JNOType::Unknown) {
                                 current_block_type = valueType;
@@ -454,12 +644,12 @@ int jno_avail(jstruct& entry, jno_evaluated& eval, const char* jno_source, int l
                     }
                 }
 
-                prototype_node.valueFlag |= (current_block_type) << 2;
+                prototype_node.flags |= (current_block_type) << 2;
             } else {  // get the next node
                 jstruct* _nodes = jalloc<jstruct>();
                 ++x;
                 x += jno_avail(*_nodes, eval, jno_source + x, length - x, depth);
-                prototype_node.valueFlag = Node_StructFlag;
+                prototype_node.flags = Node_StructFlag;
                 prototype_node.set_native_memory(_nodes);
                 x += jno_skip_comment(jno_source + x, length - x);
             }
@@ -469,10 +659,10 @@ int jno_avail(jstruct& entry, jno_evaluated& eval, const char* jno_source, int l
             }
             ++x;
         } else {  // get also value
-            x += jno_format(jno_source + x, &pointer, valueType);
+            x += jno_get_format(jno_source + x, &pointer, valueType);
             prototype_node.set_native_memory(pointer);
             pointer = nullptr;
-            prototype_node.valueFlag = Node_ValueFlag | valueType << 2;
+            // prototype_node.flags = Node_ValueFlag | valueType << 2;
         }
 
         entry.insert(std::make_pair(y = jno_string_to_hash(prototype_node.propertyName.c_str()), prototype_node));
@@ -490,7 +680,7 @@ int jno_avail(jstruct& entry, jno_evaluated& eval, const char* jno_source, int l
 
     return x;
 }
-void jno_object_parser::deserialize_from(const char* filename) {
+method void jno_object_parser::deserialize_from(const char* filename) {
     long length;
     char* buffer;
 
@@ -511,38 +701,42 @@ void jno_object_parser::deserialize_from(const char* filename) {
     deserialize((char*)buffer, length);
     free(buffer);
 }
-void jno_object_parser::deserialize(const jstring& source) { deserialize(source.data(), source.size()); }
-void jno_object_parser::deserialize(const char* source, int len) {
+method void jno_object_parser::deserialize(const jstring& source) { deserialize(source.data(), source.size()); }
+method void jno_object_parser::deserialize(const char* source, int len) {
     // FIXME: CLEAR FUNCTION IS UPGRADE
     entry.clear();  // clears alls
     jno_avail(entry, source, len);
 }
-jstring jno_object_parser::serialize() {
+method jstring jno_object_parser::serialize() {
     jstring data;
     throw std::runtime_error("no complete");
     return data;
 }
-jno_object_node* jno_object_parser::at(const jstring& name) {
+method jno_object_node* jno_object_parser::at(const jstring& name) {
     jno_object_node* node = nullptr;
-    int id = jno_string_to_hash(name.c_str());
+    int hash = jno_string_to_hash(name.c_str());
 
-    auto iter = this->entry.find(id);
+    auto iter = this->entry.find(hash);
 
     if (iter != std::end(this->entry)) node = &iter->second;
 
     return node;
 }
 
-jno_object_node* jno_object_parser::tree(const jstring& nodename) { return at(nodename); }
+method jno_object_node* jno_object_parser::tree(const jstring& nodename) { return at(nodename); }
 
-jno_object_parser::jstruct& jno_object_parser::get_struct() { return entry; }
+method jstruct& jno_object_parser::get_struct() { return entry; }
 
-jno_object_node* jno_object_parser::find_node(const jstring& nodePath) {
+method jno_object_node* jno_object_parser::find_node(const jstring& nodePath) {
     jno_object_node* node = nullptr;
     decltype(this->entry)* entry = &this->entry;
     decltype(entry->begin()) iter;
-    int l = 0, r;
+    int l, r;
     int hash;
+
+    // set l as 0
+    l ^= l;
+
     // get splits
     do {
         if ((r = nodePath.find(jno_syntax.jno_nodePathBreaker, l)) == ~0) r = static_cast<int>(nodePath.length());
@@ -563,9 +757,11 @@ jno_object_node* jno_object_parser::find_node(const jstring& nodePath) {
     return node;
 }
 
-jbool jno_object_parser::contains(const jstring& nodePath) { return find_node(nodePath) != nullptr; }
+method jbool jno_object_parser::contains(const jstring& nodePath) { return find_node(nodePath) != nullptr; }
 
-jno_object_node& operator<<(jno_object_node& root, const jstring& nodename) { return *root.tree(nodename); }
-jno_object_node& operator<<(jno_object_parser& root, const jstring& nodename) { return *root.tree(nodename); }
+method jno_object_node& operator<<(jno_object_node& root, const jstring& nodename) { return *root.tree(nodename); }
+method jno_object_node& operator<<(jno_object_parser& root, const jstring& nodename) { return *root.tree(nodename); }
 
 }  // namespace jno
+
+#undef method

@@ -31,7 +31,7 @@ class jno_object_node {
     friend class jno_object_parser;
     void* handle = nullptr;
     std::string propertyName;
-    std::uint8_t valueFlag;
+    std::uint8_t flags;
 
    public:
     jno_object_node() = default;
@@ -43,7 +43,6 @@ class jno_object_node {
 
     inline JNOType type();
 
-    [[deprecated]]
     inline bool isArray();
     inline bool isStruct();
     inline bool isValue();
@@ -59,9 +58,6 @@ class jno_object_node {
 
     [[deprecated]] void set_native_memory(void* memory);
 
-    template <typename Type>
-    void writeNew(const Type& value);
-
     jnumber& toNumber();
     jreal& toReal();
     jstring& toString();
@@ -73,7 +69,6 @@ class jno_object_node {
 };
 
 class jno_object_parser {
-   public:
    private:
     void* _storage;
     jstruct entry;

@@ -7,4 +7,4 @@ set(JNOFILEINPUT "syntax.jno")
 set(DESTINATION_JNOFILE "${CMAKE_CURRENT_BINARY_DIR}/${JNOFILEINPUT}")
 file(COPY_FILE "${CMAKE_CURRENT_SOURCE_DIR}/${JNOFILEINPUT}" ${DESTINATION_JNOFILE})
 
-target_link_libraries(jnotest JNOParser)
+target_link_libraries(jnotest jnolib)
