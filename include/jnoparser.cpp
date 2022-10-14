@@ -373,7 +373,7 @@ method int jno_avail_only(jno_evaluated& eval, const char* jno_source, int lengt
             if (jno_is_array(jno_source + x, y, length - x)) {
                 y += x++;
                 current_block_type = JNOType::Unknown;
-                prototype_node.flags = Node_ArrayFlag;
+                //prototype_node.flags = Node_ArrayFlag;
                 for (; x < y;) {
                     x += jno_skip_comment(jno_source + x, y - x);
                     // next index
@@ -411,65 +411,12 @@ method int jno_avail_only(jno_evaluated& eval, const char* jno_source, int lengt
                                        valueType != JNOType::JNONumber) {
                                 throw std::runtime_error("Multi type is found.");
                             }
-
-                            switch (current_block_type) {
-                                case JNOType::JNOString: {
-                                    auto ref = (jstring*)pointer;
-                                    ((std::vector<jstring>*)prototype_node.handle)->emplace_back(*ref);
-                                    // jfree(ref);
-                                    break;
-                                }
-                                case JNOType::JNOBoolean: {
-                                    auto ref = (jbool*)pointer;
-                                    ((std::vector<jbool>*)prototype_node.handle)->emplace_back(*ref);
-                                    // jfree(ref);
-                                    break;
-                                }
-                                case JNOType::JNOReal: {
-                                    jreal* ref;
-                                    if (valueType == JNOType::JNONumber) {
-                                        ref = new jreal(static_cast<jreal>(*(jnumber*)pointer));
-                                        jfree((jnumber*)pointer);
-                                    } else
-                                        ref = (jreal*)pointer;
-
-                                    ((std::vector<jreal>*)prototype_node.handle)->emplace_back(*ref);
-                                    jfree(ref);
-                                    break;
-                                }
-                                case JNOType::JNONumber: {
-                                    auto ref = (jnumber*)pointer;
-                                    ((std::vector<jnumber>*)prototype_node.handle)->emplace_back(*ref);
-                                    jfree(ref);
-                                    break;
-                                }
-                            }
                         }
                     }
                     x += jno_skip_comment(jno_source + x, y - x);
                 }
 
-                // shrink to fit
-                switch (current_block_type) {
-                    case JNOType::JNOString: {
-                        ((std::vector<jstring>*)prototype_node.handle)->shrink_to_fit();
-                        break;
-                    }
-                    case JNOType::JNOBoolean: {
-                        ((std::vector<jbool>*)prototype_node.handle)->shrink_to_fit();
-                        break;
-                    }
-                    case JNOType::JNOReal: {
-                        ((std::vector<jreal>*)prototype_node.handle)->shrink_to_fit();
-                        break;
-                    }
-                    case JNOType::JNONumber: {
-                        ((std::vector<jnumber>*)prototype_node.handle)->shrink_to_fit();
-                        break;
-                    }
-                }
 
-                prototype_node.flags |= (current_block_type) << 2;
             } else {  // get the next node
                 ++x;
                 x += jno_avail_only(eval, jno_source + x, length - x, depth);
@@ -519,7 +466,7 @@ method int jno_avail_only(jno_evaluated& eval, const char* jno_source, int lengt
 
     return x;
 }
-
+/*
 // big algorithm, please free me.
 // divide and conquer method avail
 method int jno_avail(jstruct& entry, jno_evaluated& eval, const char* jno_source, int length, int depth) {
@@ -674,12 +621,13 @@ method int jno_avail(jstruct& entry, jno_evaluated& eval, const char* jno_source
                 _curIter->second.prevNode = _dbgLastNode;
                 _dbgLastNode = &_curIter->second;
         #endif
-        */
+        *//*
         x += jno_skip_comment(jno_source + x, length - x);
     }
 
     return x;
 }
+*/
 method void jno_object_parser::deserialize_from(const char* filename) {
     long length;
     char* buffer;
@@ -705,7 +653,11 @@ method void jno_object_parser::deserialize(const jstring& source) { deserialize(
 method void jno_object_parser::deserialize(const char* source, int len) {
     // FIXME: CLEAR FUNCTION IS UPGRADE
     entry.clear();  // clears alls
-    jno_avail(entry, source, len);
+    jno_evaluated eval={};
+    jno_avail_only(eval, source, len, 0);
+
+    auto by = eval.calcBytes();
+
 }
 method jstring jno_object_parser::serialize() {
     jstring data;
@@ -744,7 +696,7 @@ method jno_object_node* jno_object_parser::find_node(const jstring& nodePath) {
         iter = entry->find(hash);
         if (iter != end(*entry)) {
             if (iter->second.isStruct())
-                entry = decltype(entry)(iter->second._bits);
+                entry = nullptr;//decltype(entry)(iter->second._bits);
             else {
                 if (r == nodePath.length()) node = &iter->second;  // get the next section
                 break;

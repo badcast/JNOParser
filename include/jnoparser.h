@@ -39,7 +39,7 @@ class jno_object_node {
 
     jno_object_node& operator=(const jno_object_node&);
 
-    ~jno_object_node();
+    ~jno_object_node(){}
 
     inline JNOType type();
 

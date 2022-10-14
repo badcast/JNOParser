@@ -1,4 +1,4 @@
-//Syntax    view 
+//ww
 //Comment ...                 this is comment line 
 node_name                   //this is node name
 {                           //this is structure nodes
@@ -15,5 +15,8 @@ node_name                   //this is node name
         node_3{
             n3_word "world!"
         }
-    }
+    } 
+    
+    realval 1.0 realval 1.0 realval 1.0 realval 1.0 realval 1.0 realval 1.0 realval 1.0 realval 1.0 realval 1.0 realval 1.0 realval 1.0 realval 1.0 realval 1.0 realval 1.0 realval 1.0 realval 1.0 realval 1.0 realval 1.0 realval 1.0 realval 1.0 realval 1.0 realval 1.0 realval 1.0 realval 1.0 realval 1.0 realval 1.0 realval 1.0 realval 1.0 realval 1.0 realval 1.0 realval 1.0 realval 1.0 realval 1.0 realval 1.0 realval 1.0 realval 1.0 realval 1.0 realval 1.0 realval 1.0 realval 1.0 realval 1.0 realval 1.0 realval 1.0 realval 1.0 realval 1.0 realval 1.0 realval 1.0 realval 1.0 realval 1.0 realval 1.0 realval 1.0 realval 1.0 realval 1.0 realval 1.0 realval 1.0 realval 1.0 realval 1.0 realval 1.0 realval 1.0 realval 1.0 realval 1.0 realval 1.0 realval 1.0 realval 1.0 realval 1.0 realval 1.0 realval 1.0 realval 1.0 realval 1.0 realval 1.0
+    rals  {0.1,1,1,1,1,1,1,1,1,1,.5}
 }
