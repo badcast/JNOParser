@@ -1,12 +1,6 @@
-node_name                  
-{                          
-    pi 3.14159265358979323846
-    strings  {
-        "Magnitude", 
-        "Martin",   
-        "Mangellas", 
-        "Muenqueen"
-    }
+strings  
+{
+    "This is text 1"
+    "This is text 2"
+    "This is text 3"
 }
- 
- 

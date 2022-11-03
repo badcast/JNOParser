@@ -69,7 +69,7 @@ class jno_object_node {
 };
 
 class jno_object_parser {
-   private:
+   protected:
     void* _storage;
     jstruct entry;
 
