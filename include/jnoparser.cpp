@@ -488,7 +488,7 @@ method int jno_avail_only(jno_evaluated& eval, const char* source, int length, i
 
 // big algorithm, please free me.
 // divide and conquer method avail
-method int jno_avail(jstruct& entry, jno_evaluated& eval, const char* jno_source, int length, int depth) {
+method int jno_avail(jstruct& entry, jno_evaluated& eval, const char* source, int length, int depth) {
     int x, y;
     JNOType valueType;
     JNOType current_block_type;
@@ -498,37 +498,37 @@ method int jno_avail(jstruct& entry, jno_evaluated& eval, const char* jno_source
     };
 
     jno_object_node prototype_node;
-    void* pointer;
+    const char* pointer = source;
 
     // base step
     if (!length) return 0;
 
-    for (x ^= x; x < length && jno_source[x];) {
+    for (x ^= x; x < length && pointer[x];) {
         // has comment line
-        y = x += jno_skip_comment(jno_source + x, length - x);
-        if (depth > 0 && jno_source[x] == jno_syntax.jno_array_segments[1]) break;
-        x += jno_skip(jno_source + x, length - x);
+        y = x += jno_skip_comment(pointer + x, length - x);
+        if (depth > 0 && pointer[x] == jno_syntax.jno_array_segments[1]) break;
+        x += jno_skip(pointer + x, length - x);
         // check property name
-        if (!jno_is_property(jno_source + y, x - y)) throw std::bad_exception();
+        if (!jno_is_property(pointer + y, x - y)) throw std::bad_exception();
         prototype_node = {};
-        prototype_node.propertyName.append(jno_source + y, static_cast<size_t>(x - y));
+        prototype_node.propertyName.append(pointer + y, static_cast<size_t>(x - y));
         // has comment line
-        x += jno_skip_comment(jno_source + x, length - x);
-        x += jno_trim(jno_source + x, length - x);  // trim string
+        x += jno_skip_comment(pointer + x, length - x);
+        x += jno_trim(pointer + x, length - x);  // trim string
         // is block or array
-        if (jno_source[x] == *jno_syntax.jno_array_segments) {
+        if (pointer[x] == *jno_syntax.jno_array_segments) {
 
-            if (jno_is_array(jno_source + x, y, length - x)) {
+            if (jno_is_array(pointer + x, y, length - x)) {
                 y += x++;
                 current_block_type = JNOType::Unknown;
                 prototype_node.flags = Node_ArrayFlag;
                 for (; x < y;) {
-                    x += jno_skip_comment(jno_source + x, y - x);
+                    x += jno_skip_comment(pointer + x, y - x);
                     // next index
-                    if (jno_source[x] == jno_syntax.jno_obstacle)
+                    if (pointer[x] == jno_syntax.jno_obstacle)
                         ++x;
                     else {
-                        x += jno_get_format(jno_source + x, &pointer, valueType);
+                        x += jno_get_format(pointer + x, &pointer, valueType);
                         if (valueType != JNOType::Unknown) {
                             if (current_block_type == JNOType::Unknown) {
                                 current_block_type = valueType;
@@ -587,7 +587,7 @@ method int jno_avail(jstruct& entry, jno_evaluated& eval, const char* jno_source
                             }
                         }
                     }
-                    x += jno_skip_comment(jno_source + x, y - x);
+                    x += jno_skip_comment(pointer + x, y - x);
                 }
 
                 // shrink to fit
@@ -614,17 +614,17 @@ method int jno_avail(jstruct& entry, jno_evaluated& eval, const char* jno_source
             } else {  // get the next node
                 jstruct* _nodes = jalloc<jstruct>();
                 ++x;
-                x += jno_avail(*_nodes, eval, jno_source + x, length - x, depth+1);
+                x += jno_avail(*_nodes, eval, pointer + x, length - x, depth+1);
                 prototype_node.flags = Node_StructFlag;
                 prototype_node.set_native_memory(_nodes);
-                x += jno_skip_comment(jno_source + x, length - x);
+                x += jno_skip_comment(pointer + x, length - x);
             }
-            if (jno_source[x] != jno_syntax.jno_array_segments[1]) {
+            if (pointer[x] != jno_syntax.jno_array_segments[1]) {
                 throw std::bad_exception();
             }
             ++x;
         } else {  // get also value
-            x += jno_get_format(jno_source + x, &pointer, valueType);
+            x += jno_get_format(pointer + x, &pointer, valueType);
             prototype_node.set_native_memory(pointer);
             pointer = nullptr;
             // prototype_node.flags = Node_ValueFlag | valueType << 2;
@@ -640,7 +640,7 @@ method int jno_avail(jstruct& entry, jno_evaluated& eval, const char* jno_source
                 _dbgLastNode = &_curIter->second;
         #endif
             */
-        x += jno_skip_comment(jno_source + x, length - x);
+        x += jno_skip_comment(pointer + x, length - x);
     }
 
     return x;
@@ -674,6 +674,7 @@ method void jno_object_parser::deserialize(const char* source, int len) {
     jno_evaluated eval = {};
     jno_avail_only(eval, source, len, 0);
 
+    jno_avail()
     auto by = eval.calcBytes();
 }
 method jstring jno_object_parser::serialize() {
