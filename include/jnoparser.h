@@ -110,6 +110,6 @@ jno_object_node& operator<<(jno_object_node& root, const jstring& nodename);
 
 jno_object_node& operator<<(jno_object_parser& root, const jstring& nodename);
 
-int jno_string_to_hash(const char* str, int len = INT32_MAX);
+int jno_string_to_hash_fast(const char* str, int len = INT32_MAX);
 
 }  // namespace jno

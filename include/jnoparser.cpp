@@ -23,10 +23,8 @@ static const struct {
     char jno_valid_property_char = '_';
 } jno_syntax;
 
-//TODO: Get status messages
-static const struct {
-    const char * msg_multitype_cast = "";
-} jno_error_messages;
+// TODO: Get status messages
+static const struct { const char* msg_multitype_cast = ""; } jno_error_messages;
 
 enum { Node_ValueFlag = 1, Node_ArrayFlag = 2, Node_StructFlag = 3 };
 
@@ -100,7 +98,7 @@ inline T* jalloc(const T& copy) {
 
 template <typename T>
 inline void jfree(T* pointer) {
-    free(pointer);
+    std::free(pointer);
     // RoninEngine::Runtime::GC::gc_unalloc(pointer);
 }
 
@@ -182,10 +180,11 @@ method inline jbool jno_has_datatype(const char* content) {
 }
 
 method int jno_trim(const char* content, int contentLength = std::numeric_limits<int>::max()) {
-    int i = 0, j;
+    int i, j;
+    i ^= i;
     if (content != nullptr)
         for (; i < contentLength && content[i];) {
-            for (j = 0; j < static_cast<int>(sizeof(jno_syntax.jno_trim_segments));)
+            for (j ^= j; j < static_cast<int>(sizeof(jno_syntax.jno_trim_segments));)
                 if (content[i] == jno_syntax.jno_trim_segments[j])
                     break;
                 else
@@ -283,11 +282,10 @@ method jbool jno_is_array(const char* content, int& endpoint, int contentLength 
     return result;
 }
 
-method inline int jno_string_to_hash(const char* content, int contentLength) {
-    int x = 1;
-    int y;
+method inline int jno_string_to_hash_fast(const char* content, int contentLength) {
+    int x = 1, y;
     y ^= y;
-    while (*(content) && y++ < contentLength) x *= *(content);
+    while (*(content) && y++ < contentLength) x *= *content;
     return x;
 }
 
@@ -357,7 +355,7 @@ method int jno_avail_only(jno_evaluated& eval, const char* source, int length, i
     // base step
     if (!length) return 0;
 
-    for (x ^= x; x < length && *pointer;) {
+    for (x ^= x; x < length;) {
         // has comment line
         y = x += jno_skip_comment(pointer + x, length - x);
         if (depth > 0 && pointer[x] == jno_syntax.jno_array_segments[1]) break;
@@ -503,7 +501,7 @@ method int jno_avail(jstruct& entry, jno_evaluated& eval, const char* source, in
     // base step
     if (!length) return 0;
 
-    for (x ^= x; x < length && pointer[x];) {
+    for (x ^= x; x < length;) {
         // has comment line
         y = x += jno_skip_comment(pointer + x, length - x);
         if (depth > 0 && pointer[x] == jno_syntax.jno_array_segments[1]) break;
@@ -517,7 +515,6 @@ method int jno_avail(jstruct& entry, jno_evaluated& eval, const char* source, in
         x += jno_trim(pointer + x, length - x);  // trim string
         // is block or array
         if (pointer[x] == *jno_syntax.jno_array_segments) {
-
             if (jno_is_array(pointer + x, y, length - x)) {
                 y += x++;
                 current_block_type = JNOType::Unknown;
@@ -614,7 +611,7 @@ method int jno_avail(jstruct& entry, jno_evaluated& eval, const char* source, in
             } else {  // get the next node
                 jstruct* _nodes = jalloc<jstruct>();
                 ++x;
-                x += jno_avail(*_nodes, eval, pointer + x, length - x, depth+1);
+                x += jno_avail(*_nodes, eval, pointer + x, length - x, depth + 1);
                 prototype_node.flags = Node_StructFlag;
                 prototype_node.set_native_memory(_nodes);
                 x += jno_skip_comment(pointer + x, length - x);
@@ -630,7 +627,7 @@ method int jno_avail(jstruct& entry, jno_evaluated& eval, const char* source, in
             // prototype_node.flags = Node_ValueFlag | valueType << 2;
         }
 
-        entry.insert(std::make_pair(y = jno_string_to_hash(prototype_node.propertyName.c_str()), prototype_node));
+        entry.insert(std::make_pair(y = jno_string_to_hash_fast(prototype_node.propertyName.c_str()), prototype_node));
         /*
         #if defined(QDEBUG) || defined(DEBUG)
                 // get iter
@@ -674,8 +671,7 @@ method void jno_object_parser::deserialize(const char* source, int len) {
     jno_evaluated eval = {};
     jno_avail_only(eval, source, len, 0);
 
-    jno_avail()
-    auto by = eval.calcBytes();
+    jno_avail() auto by = eval.calcBytes();
 }
 method jstring jno_object_parser::serialize() {
     jstring data;
@@ -684,7 +680,7 @@ method jstring jno_object_parser::serialize() {
 }
 method jno_object_node* jno_object_parser::at(const jstring& name) {
     jno_object_node* node = nullptr;
-    int hash = jno_string_to_hash(name.c_str());
+    int hash = jno_string_to_hash_fast(name.c_str());
 
     auto iter = this->entry.find(hash);
 
@@ -710,7 +706,7 @@ method jno_object_node* jno_object_parser::find_node(const jstring& nodePath) {
     // get splits
     do {
         if ((r = nodePath.find(jno_syntax.jno_nodePathBreaker, l)) == ~0) r = static_cast<int>(nodePath.length());
-        hash = jno_string_to_hash(nodePath.c_str() + l, r - l);
+        hash = jno_string_to_hash_fast(nodePath.c_str() + l, r - l);
         iter = entry->find(hash);
         if (iter != end(*entry)) {
             if (iter->second.isStruct())
