@@ -25,21 +25,20 @@ using jstruct = std::map<int, jno_object_node>;
 
 enum JNOSerializedFormat { JNOBeautify, JNOCompact };
 
-enum JNOType { Unknown = 0, JNOString = 1, JNOBoolean = 2, JNOReal = 3, JNONumber = 4 };
+enum JNOType : std::uint8_t { Null = 255, Unknown = 0, JNOBoolean, JNONumber, JNOReal, JNOString };
 
 class jno_object_node {
     friend class jno_object_parser;
     void* handle = nullptr;
-    std::string propertyName;
-    std::uint8_t flags;
 
    public:
+    std::string propertyName;
+
     jno_object_node() = default;
     jno_object_node(const jno_object_node&);
+    virtual ~jno_object_node() = default;
 
     jno_object_node& operator=(const jno_object_node&);
-
-    ~jno_object_node(){}
 
     inline JNOType type();
 
