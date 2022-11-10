@@ -29,19 +29,19 @@ static const struct { const char* msg_multitype_cast = ""; } jno_error_messages;
 enum { Node_ValueFlag = 1, Node_ArrayFlag = 2, Node_StructFlag = 3 };
 
 // NOTE: storage description
+/*
+    index  |types
+    -------|---------------|
+    0       bools
+    1       numbers
+    2       reals
+    3       strings
+    4       properties
+*/
 
 struct jno_storage {
     // up members: meta-info
-    int numProperties;
-    int numNumbers;
-    int numReals;
-    int numBools;
-    int numStrings;
-    int _properties;
-    int _numbers;
-    int _reals;
-    int _bools;
-    int _strings;
+    jnumber numBools, numNumbers, numReals, numStrings, numProperties, arrayBools, arrayNumbers, arrayReals, arrayStrings;
 };
 
 struct jno_evaluated {
@@ -104,10 +104,23 @@ inline void jfree(T* pointer) {
 
 inline void jfree(void* pointer) { std::free(pointer); }
 
-method jno_evaluated jno_analize(jno_object_parser* parser) {
-    jno_evaluated eval = {};
+method JNOType jno_get_type(const void* pointer, jno_storage* pstorage) {
+    const jnumber* alpha = reinterpret_cast<jnumber*>(pstorage);
+    const void* delta = pstorage + 1;
+    int type;
+    if (pointer) {
+        type = JNOType::Unknown;
+        for (; pointer < delta; ++alpha) {
+            //get type
+            ++type;
+            //set next pointer
+            delta += static_cast<std::uint32_t>(*alpha >> 32);  // high (bytes)
+        }
+    } else
+        //ops: Type is null, var is empty
+        type = JNOType::Null;
 
-    return eval;
+    return static_cast<JNOType>(type);
 }
 
 method bool jno_is_jnumber(const char character) { return std::isdigit(character) || character == '-'; }
@@ -160,7 +173,7 @@ method int jno_get_format(const char* content, void** mem, JNOType& out) {
 
         offset += 2;
     } else if (jno_is_jreal(content, &offset)) {
-        if (mem) *mem = jalloc<jreal>(static_cast<double>(atof(content)));
+        if (mem) *mem = jalloc<jreal>(static_cast<jreal>(atof(content)));
         out = JNOType::JNOReal;
     } else if (jno_is_jnumber(*content)) {
         if (mem) *mem = jalloc<jnumber>(atoll(content));
@@ -257,22 +270,22 @@ method inline jbool jno_is_space(const char c) {
 }
 
 method jbool jno_is_array(const char* content, int& endpoint, int contentLength = std::numeric_limits<int>::max()) {
-    int i = 0;
+    int x = 0;
     jbool result = false;
 
-    if (*content == jno_syntax.jno_array_segments[0]) {
-        ++i;
-        i += jno_trim(content + i);
+    if (*content == *jno_syntax.jno_array_segments) {
+        ++x;
+        x += jno_trim(content + x);
 
-        i += jno_skip_comment(content + i, contentLength - i);
-        i += jno_trim(content + i);
+        x += jno_skip_comment(content + x, contentLength - x);
+        x += jno_trim(content + x);
 
-        if (jno_has_datatype(content + i) || content[i] == jno_syntax.jno_array_segments[1]) {
-            for (; content[i] && i < contentLength; ++i) {
-                if (content[i] == jno_syntax.jno_array_segments[0])
+        if (jno_has_datatype(content + x) || content[x] == jno_syntax.jno_array_segments[1]) {
+            for (; content[x] && x < contentLength; ++x) {
+                if (content[x] == jno_syntax.jno_array_segments[0])
                     break;
-                else if (content[i] == jno_syntax.jno_array_segments[1]) {
-                    endpoint = i;
+                else if (content[x] == jno_syntax.jno_array_segments[1]) {
+                    endpoint = x;
                     result = true;
                     break;
                 }
@@ -518,7 +531,7 @@ method int jno_avail(jstruct& entry, jno_evaluated& eval, const char* source, in
             if (jno_is_array(pointer + x, y, length - x)) {
                 y += x++;
                 current_block_type = JNOType::Unknown;
-                prototype_node.flags = Node_ArrayFlag;
+                // prototype_node.flags = Node_ArrayFlag;
                 for (; x < y;) {
                     x += jno_skip_comment(pointer + x, y - x);
                     // next index
@@ -695,7 +708,7 @@ method jstruct& jno_object_parser::get_struct() { return entry; }
 
 method jno_object_node* jno_object_parser::find_node(const jstring& nodePath) {
     jno_object_node* node = nullptr;
-    decltype(this->entry)* entry = &this->entry;
+    std::add_pointer<decltype(this->entry)>::type entry = &this->entry;
     decltype(entry->begin()) iter;
     int l, r;
     int hash;
