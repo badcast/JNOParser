@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <map>
 #include <cstring>
 #include <vector>
@@ -23,7 +24,7 @@ typedef bool jbool;
 
 using jstruct = std::map<int, jno_object_node>;
 
-enum JNOSerializedFormat { JNOBeautify, JNOCompact };
+enum JNOSerializeFormat { JNOBeautify, JNOCompact };
 
 enum JNOType : std::uint8_t { Null = 255, Unknown = 0, JNOBoolean, JNONumber, JNOReal, JNOString };
 
@@ -40,31 +41,12 @@ class jno_object_node {
 
     jno_object_node& operator=(const jno_object_node&);
 
-    inline JNOType type();
-
-    inline bool isArray();
-    inline bool isStruct();
-    inline bool isValue();
-    inline bool isNumber();
-    inline bool isReal();
-    inline bool isString();
-    inline bool isBoolean();
+    JNOType type();
 
     jno_object_node* tree(const jstring& child);
 
     // Property name it is Node
     std::string& getPropertyName();
-
-    [[deprecated]] void set_native_memory(void* memory);
-
-    jnumber& toNumber();
-    jreal& toReal();
-    jstring& toString();
-    std::vector<jreal>* toReals();
-    std::vector<jnumber>* toNumbers();
-    bool& toBoolean();
-    std::vector<jstring>* toStrings();
-    std::vector<jbool>* toBooleans();
 };
 
 class jno_object_parser {

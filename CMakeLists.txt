@@ -11,6 +11,6 @@ enable_testing()
 include_directories(include)
 
 file(GLOB TARGET_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h" "${CMAKE_CURRENT_SOURCE_DIR}/include/*.cpp")
-add_library(jnolib ${TARGET_SOURCES})
+add_library(jnolib STATIC ${TARGET_SOURCES})
 target_include_directories(jnolib INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
 add_subdirectory(jnotest)
