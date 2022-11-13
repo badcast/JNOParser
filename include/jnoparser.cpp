@@ -105,6 +105,7 @@ inline void jfree(T* pointer) {
 
 inline void jfree(void* pointer) { std::free(pointer); }
 
+//method for get type from pointer (storage required)
 method JNOType jno_get_type(const void* pointer, jno_storage* pstorage) {
     const jnumber* alpha = reinterpret_cast<jnumber*>(pstorage);
     const void* delta = pstorage + 1;
@@ -124,8 +125,12 @@ method JNOType jno_get_type(const void* pointer, jno_storage* pstorage) {
     return static_cast<JNOType>(type);
 }
 
+
+//method for check is number ?
 method bool jno_is_jnumber(const char character) { return std::isdigit(character) || character == '-'; }
 
+
+//method for check is real ?
 method jbool jno_is_jreal(const char* content, int* getLength) {
     bool real = false;
     for (;;) {
@@ -141,6 +146,7 @@ method jbool jno_is_jreal(const char* content, int* getLength) {
     return real;
 }
 
+//method for check is bool ?
 method inline jbool jno_is_jbool(const char* content, int* getLength) {
     if (!strncmp(content, jno_syntax.jno_true_string, *getLength = sizeof(jno_syntax.jno_true_string) - 1)) return true;
     if (!strncmp(content, jno_syntax.jno_false_string, *getLength = sizeof(jno_syntax.jno_false_string) - 1)) return true;
@@ -148,6 +154,7 @@ method inline jbool jno_is_jbool(const char* content, int* getLength) {
     return false;
 }
 
+//method for get format from raw content, also to write in mem pointer
 method int jno_get_format(const char* content, void** mem, JNOType& out) {
     int offset;
     size_t i;
@@ -190,12 +197,14 @@ method int jno_get_format(const char* content, void** mem, JNOType& out) {
     return offset;
 }
 
+//method for check. has type in value
 method inline jbool jno_has_datatype(const char* content) {
     JNOType type;
     jno_get_format(const_cast<char*>(content), nullptr, type);
     return type != JNOType::Unknown;
 }
 
+//method for trim
 method int jno_trim(const char* content, int contentLength = std::numeric_limits<int>::max()) {
     int i, j;
     i ^= i;
