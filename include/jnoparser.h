@@ -79,7 +79,7 @@ class jno_object_parser {
     // search node by name or prefix value, example
     jno_object_node* search(const std::string& name);
 
-    // result of occupied memory alls nodes
+    // result of occupied memory forevery nodes
     jnumber occupied_memory();
 
     bool contains(const std::string& nodePath);

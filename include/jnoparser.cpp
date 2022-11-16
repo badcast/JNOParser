@@ -14,7 +14,7 @@ static const struct {
     char jno_nodePathBreaker = '/';
     char jno_commentLine[3] = "//";
     char jno_left_seperator = '\\';
-    char jno_eof_segment = '\n';
+    char jno_eol_segment = '\n';
     char jno_format_string = '\"';
     char jno_true_string[5] = "true";
     char jno_false_string[6] = "false";
@@ -22,6 +22,7 @@ static const struct {
     char jno_array_segments[2]{'{', '}'};
     char jno_trim_segments[5]{' ', '\t', '\n', '\r', '\v'};
     char jno_valid_property_char = '_';
+    char jno_valid_property_name[2] = {'A', 'z'};
 } jno_syntax;
 
 // TODO: Get status messages
@@ -105,7 +106,7 @@ inline void jfree(T* pointer) {
 
 inline void jfree(void* pointer) { std::free(pointer); }
 
-//method for get type from pointer (storage required)
+// method for get type from pointer (storage required)
 method JNOType jno_get_type(const void* pointer, jno_storage* pstorage) {
     const jnumber* alpha = reinterpret_cast<jnumber*>(pstorage);
     const void* delta = pstorage + 1;
@@ -125,12 +126,12 @@ method JNOType jno_get_type(const void* pointer, jno_storage* pstorage) {
     return static_cast<JNOType>(type);
 }
 
+// method for check is number ?
+method inline bool jno_is_jnumber(const char character) { return jno_is_unsigned_jnumber(character) || character == '-'; }
 
-//method for check is number ?
-method bool jno_is_jnumber(const char character) { return std::isdigit(character) || character == '-'; }
+method inline bool jno_is_unsigned_jnumber(const char character) { return std::isdigit(character); }
 
-
-//method for check is real ?
+// method for check is real ?
 method jbool jno_is_jreal(const char* content, int* getLength) {
     bool real = false;
     for (;;) {
@@ -146,7 +147,7 @@ method jbool jno_is_jreal(const char* content, int* getLength) {
     return real;
 }
 
-//method for check is bool ?
+// method for check is bool ?
 method inline jbool jno_is_jbool(const char* content, int* getLength) {
     if (!strncmp(content, jno_syntax.jno_true_string, *getLength = sizeof(jno_syntax.jno_true_string) - 1)) return true;
     if (!strncmp(content, jno_syntax.jno_false_string, *getLength = sizeof(jno_syntax.jno_false_string) - 1)) return true;
@@ -154,17 +155,17 @@ method inline jbool jno_is_jbool(const char* content, int* getLength) {
     return false;
 }
 
-//method for get format from raw content, also to write in mem pointer
+// method for get format from raw content, also to write in mem pointer
 method int jno_get_format(const char* content, void** mem, JNOType& out) {
     int offset;
     size_t i;
 
-    out = JNOType::Unknown;
-
     offset ^= offset;  // set to zero
 
     // string type
-    if (*content == jno_syntax.jno_format_string) {
+    if (content == nullptr || *content == nullptr)
+        out = JNOType::Null;
+    else if (*content == jno_syntax.jno_format_string) {
         ++offset;
         for (; content[offset] != jno_syntax.jno_format_string; ++offset)
             if (content[offset] == jno_syntax.jno_left_seperator && content[offset + 1] == jno_syntax.jno_format_string)
@@ -179,10 +180,10 @@ method int jno_get_format(const char* content, void** mem, JNOType& out) {
                 }
                 *mem = static_cast<void*>(jalloc(jstring(str)));
             }
-            out = JNOType::JNOString;
         }
 
         offset += 2;
+        out = JNOType::JNOString;
     } else if (jno_is_jreal(content, &offset)) {
         if (mem) *mem = jalloc<jreal>(static_cast<jreal>(atof(content)));
         out = JNOType::JNOReal;
@@ -192,36 +193,37 @@ method int jno_get_format(const char* content, void** mem, JNOType& out) {
     } else if (jno_is_jbool(content, &offset)) {
         if (mem) *mem = jalloc<jbool>(offset == sizeof(jno_syntax.jno_true_string) - 1);
         out = JNOType::JNOBoolean;
-    }  // another type
+    } else  // another type
+        out = JNOType::Unknown;
 
     return offset;
 }
 
-//method for check. has type in value
+// method for check. has type in value
 method inline jbool jno_has_datatype(const char* content) {
     JNOType type;
     jno_get_format(const_cast<char*>(content), nullptr, type);
     return type != JNOType::Unknown;
 }
 
-//method for trim
+// method for trim
 method int jno_trim(const char* content, int contentLength = std::numeric_limits<int>::max()) {
-    int i, j;
-    i ^= i;
+    int x, y;
+    x ^= x;
     if (content != nullptr)
-        for (; i < contentLength && *content;) {
-            for (j ^= j; j < static_cast<int>(sizeof(jno_syntax.jno_trim_segments));)
-                if (*content == jno_syntax.jno_trim_segments[j])
+        for (; x < contentLength && *content;) {
+            for (y ^= y; y < static_cast<int>(sizeof(jno_syntax.jno_trim_segments));)
+                if (*content == jno_syntax.jno_trim_segments[y])
                     break;
                 else
-                    ++j;
-            if (j != sizeof(jno_syntax.jno_trim_segments)) {
-                ++i;
+                    ++y;
+            if (y != sizeof(jno_syntax.jno_trim_segments)) {
+                ++x;
                 ++content;
             } else
                 break;
         }
-    return i;
+    return x;
 }
 
 method int jno_skip(const char* c, int len = std::numeric_limits<int>::max()) {
@@ -245,12 +247,12 @@ method int jno_skip(const char* c, int len = std::numeric_limits<int>::max()) {
     return x;
 }
 
-method inline jbool jno_is_property(const char* abstractContent, int len) {
+method inline jbool jno_valid_property_name(const char* abstractContent, int len) {
     int x;
     for (x ^= x; x < len; ++x, ++abstractContent)
-        if (!((*abstractContent >= 'A' && *abstractContent <= 'z') ||
-              (x && *abstractContent != '-' && jno_is_jnumber(*abstractContent)) ||
-              *abstractContent == jno_syntax.jno_valid_property_char))
+        if (!((*abstractContent >= *jno_syntax.jno_valid_property_name &&
+               *abstractContent <= jno_syntax.jno_valid_property_name[1]) ||
+              (x && jno_is_unsigned_jnumber(*abstractContent)) || *abstractContent == jno_syntax.jno_valid_property_char))
             return false;
     return len != 0;
 }
@@ -259,20 +261,20 @@ method inline jbool jno_is_comment_line(const char* c, int len) {
     return len > 0 && !strncmp(c, jno_syntax.jno_commentLine, std::min(2, len));
 }
 
-method inline int jno_move_eof(const char* c, int len = std::numeric_limits<int>::max()) {
-    int i;
-    for (i ^= i; *c && i < len && *c != jno_syntax.jno_eof_segment; ++i, ++c)
+method inline int jno_has_eol(const char* c, int len = std::numeric_limits<int>::max()) {
+    int x;
+    for (x ^= x; *c && x < len && *c != jno_syntax.jno_eol_segment; ++x, ++c)
         ;
-    return i;
+    return x;
 }
 
 method inline int jno_skip_comment(const char* c, int len) {
-    int i = jno_trim(c, len);
-    while (jno_is_comment_line(c + i, len - i)) {
-        i += jno_move_eof(c + i, len - i);
-        i += jno_trim(c + i, len - i);
+    int x = jno_trim(c, len);
+    while (jno_is_comment_line(c + x, len - x)) {
+        x += jno_has_eol(c + x, len - x);
+        x += jno_trim(c + x, len - x);
     }
-    return i;
+    return x;
 }
 
 method inline jbool jno_is_space(const char c) {
@@ -284,10 +286,11 @@ method inline jbool jno_is_space(const char c) {
 }
 
 method jbool jno_is_array(const char* content, int& endpoint, int contentLength = std::numeric_limits<int>::max()) {
-    int x = 0;
+    int x;
     jbool result = false;
 
     if (*content == *jno_syntax.jno_array_segments) {
+        x ^= x;
         ++x;
         x += jno_trim(content + x);
 
