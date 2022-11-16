@@ -1,7 +1,7 @@
 #include <cstdlib>
 #include <limits>
 
-#include "jnoparser.h"
+#include "jnoparser"
 
 #define method
 
