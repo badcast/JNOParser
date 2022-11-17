@@ -1,3 +1,8 @@
+// C++ code
+//  author: badcast <lmecomposer@gmail.com>
+//  github: github.com/badcast
+//  soundcloud: soundcloud.com/light-mister
+
 #pragma once
 
 #include <cstdint>
@@ -30,26 +35,29 @@ enum JNOType : std::uint8_t { Null = 255, Unknown = 0, JNOBoolean, JNONumber, JN
 
 class jno_object_node {
     friend class jno_object_parser;
+
     void* handle = nullptr;
+    jno_object_parser* head;
+
+    jno_object_node(jno_object_parser* head, void* handle);
 
    public:
-    std::string propertyName;
+    // Property name it is Node
+    const jstring name() const;
 
-    jno_object_node() = default;
-    jno_object_node(const jno_object_node&);
-    virtual ~jno_object_node() = default;
-
-    jno_object_node& operator=(const jno_object_node&);
-
+    // Property type for get type
     JNOType type();
 
+    // Property tree for get child
     jno_object_node* tree(const jstring& child);
 
-    // Property name it is Node
-    std::string& getPropertyName();
+    template <typename ValueTp>
+    const ValueTp& value() const;
 };
 
 class jno_object_parser {
+    friend class jno_object_node;
+
    protected:
     void* _storage;
     jstruct entry;

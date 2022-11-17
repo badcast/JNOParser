@@ -10,7 +10,6 @@ namespace jno {
 static const struct {
     char jno_dot = '.';
     char jno_obstacle = ',';
-    char jno_space = ' ';
     char jno_nodePathBreaker = '/';
     char jno_commentLine[3] = "//";
     char jno_left_seperator = '\\';
@@ -20,13 +19,13 @@ static const struct {
     char jno_false_string[6] = "false";
     char jno_null_string[5] = "null";
     char jno_array_segments[2]{'{', '}'};
-    char jno_trim_segments[5]{' ', '\t', '\n', '\r', '\v'};
+    char jno_trim_segments[5]{32, '\t', '\n', '\r', '\v'};
     char jno_valid_property_char = '_';
     char jno_valid_property_name[2] = {'A', 'z'};
 } jno_syntax;
 
 // TODO: Get status messages
-static const struct { const char* msg_multitype_cast = ""; } jno_error_messages;
+// static const struct { const char* msg_multitype_cast = ""; } jno_error_messages;
 
 enum { Node_ValueFlag = 1, Node_ArrayFlag = 2, Node_StructFlag = 3 };
 
@@ -125,11 +124,10 @@ method JNOType jno_get_type(const void* pointer, jno_storage* pstorage) {
 
     return static_cast<JNOType>(type);
 }
-
-// method for check is number ?
-method inline bool jno_is_jnumber(const char character) { return jno_is_unsigned_jnumber(character) || character == '-'; }
-
+// method for check valid a unsigned number
 method inline bool jno_is_unsigned_jnumber(const char character) { return std::isdigit(character); }
+// method for check valid a signed number
+method inline bool jno_is_jnumber(const char character) { return jno_is_unsigned_jnumber(character) || character == '-'; }
 
 // method for check is real ?
 method jbool jno_is_jreal(const char* content, int* getLength) {
@@ -163,7 +161,7 @@ method int jno_get_format(const char* content, void** mem, JNOType& out) {
     offset ^= offset;  // set to zero
 
     // string type
-    if (content == nullptr || *content == nullptr)
+    if (content == nullptr || *content == '\0')
         out = JNOType::Null;
     else if (*content == jno_syntax.jno_format_string) {
         ++offset;
@@ -319,17 +317,18 @@ method inline int jno_string_to_hash_fast(const char* content, int contentLength
     return x;
 }
 
-method JNOType jno_object_node::type() {
-    jno_get_type(handle, ?? Where jno_storage ?);
+// JNO Object Node
+
+jno_object_node::jno_object_node(jno_object_parser* head, void* handle) {
+    this->head = head;
+    this->handle = handle;
 }
+
+method JNOType jno_object_node::type() { jno_get_type(handle, static_cast<jno_storage*>(this->head->_storage)); }
 
 method jno_object_node* jno_object_node::tree(const jstring& child) { return nullptr; }
 
-method jstring& jno_object_node::getPropertyName() { return this->propertyName; }
-
-method jno_object_parser::jno_object_parser() {}
-
-method jno_object_parser::~jno_object_parser() {}
+method const jstring jno_object_node::name() const { return jstring(static_cast<char*>(handle)); }
 
 method int jno_avail_only(jno_evaluated& eval, const char* source, int length, int depth) {
     int x, y, z;
@@ -345,8 +344,9 @@ method int jno_avail_only(jno_evaluated& eval, const char* source, int length, i
         y = x += jno_skip_comment(pointer + x, length - x);
         if (depth > 0 && pointer[x] == jno_syntax.jno_array_segments[1]) break;
         x += jno_skip(pointer + x, length - x);
+
         // check property name
-        if (!jno_is_property(pointer + y, x - y)) throw std::bad_exception();
+        if (!jno_valid_property_name(pointer + y, x - y)) throw std::bad_exception();
 
         // property name
         // prototype_node.propertyName.append(jno_source + y, static_cast<size_t>(x - y));
@@ -480,7 +480,6 @@ method int jno_avail(jstruct& entry, jno_evaluated& eval, const char* source, in
         void* data;
     };
 
-    jno_object_node prototype_node;
     const char* pointer = source;
 
     // base step
@@ -597,7 +596,7 @@ method int jno_avail(jstruct& entry, jno_evaluated& eval, const char* source, in
                 jstruct* _nodes = jalloc<jstruct>();
                 ++x;
                 x += jno_avail(*_nodes, eval, pointer + x, length - x, depth + 1);
-                prototype_node.flags = Node_StructFlag;
+                // prototype_node.flags = Node_StructFlag;
                 prototype_node.set_native_memory(_nodes);
                 x += jno_skip_comment(pointer + x, length - x);
             }
@@ -652,8 +651,8 @@ method void jno_object_parser::deserialize_from(const char* filename) {
 method void jno_object_parser::deserialize(const jstring& source) { deserialize(source.data(), source.size()); }
 method void jno_object_parser::deserialize(const char* source, int len) {
     // FIXME: CLEAR FUNCTION IS UPGRADE
-    entry.clear();  // clears alls
     jno_evaluated eval = {};
+    entry.clear();  // clears alls
     jno_avail_only(eval, source, len, 0);
 }
 method jstring jno_object_parser::serialize() {
