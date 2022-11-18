@@ -20,8 +20,7 @@ static const struct {
     char jno_null_string[5] = "null";
     char jno_array_segments[2]{'{', '}'};
     char jno_trim_segments[5]{32, '\t', '\n', '\r', '\v'};
-    char jno_valid_property_char = '_';
-    char jno_valid_property_name[2] = {'A', 'z'};
+    char jno_valid_property_name[3] = {'A', 'z', '_'};
 } jno_syntax;
 
 // TODO: Get status messages
@@ -126,6 +125,7 @@ method JNOType jno_get_type(const void* pointer, jno_storage* pstorage) {
 }
 // method for check valid a unsigned number
 method inline bool jno_is_unsigned_jnumber(const char character) { return std::isdigit(character); }
+
 // method for check valid a signed number
 method inline bool jno_is_jnumber(const char character) { return jno_is_unsigned_jnumber(character) || character == '-'; }
 
@@ -250,7 +250,7 @@ method inline jbool jno_valid_property_name(const char* abstractContent, int len
     for (x ^= x; x < len; ++x, ++abstractContent)
         if (!((*abstractContent >= *jno_syntax.jno_valid_property_name &&
                *abstractContent <= jno_syntax.jno_valid_property_name[1]) ||
-              (x && jno_is_unsigned_jnumber(*abstractContent)) || *abstractContent == jno_syntax.jno_valid_property_char))
+              (x && jno_is_unsigned_jnumber(*abstractContent)) || *abstractContent == jno_syntax.jno_valid_property_name[2]))
             return false;
     return len != 0;
 }
@@ -491,7 +491,7 @@ method int jno_avail(jstruct& entry, jno_evaluated& eval, const char* source, in
         if (depth > 0 && pointer[x] == jno_syntax.jno_array_segments[1]) break;
         x += jno_skip(pointer + x, length - x);
         // check property name
-        if (!jno_is_property(pointer + y, x - y)) throw std::bad_exception();
+        if (!jno_valid_property_name(pointer + y, x - y)) throw std::bad_exception();
         prototype_node = {};
         prototype_node.propertyName.append(pointer + y, static_cast<size_t>(x - y));
         // has comment line
