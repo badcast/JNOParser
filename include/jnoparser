@@ -51,8 +51,18 @@ class jno_object_node {
     // Property tree for get child
     jno_object_node* tree(const jstring& child);
 
+    // Property defined tree
+    jbool has_tree() const ;
+
     template <typename ValueTp>
     const ValueTp& value() const;
+
+    /* operators */
+
+    explicit operator jstring();
+    explicit operator jnumber();
+    explicit operator jreal();
+    explicit operator jbool();
 };
 
 class jno_object_parser {
@@ -72,7 +82,7 @@ class jno_object_parser {
     void deserialize(const char* source, int len);
     void deserialize(const std::string& content, int depth = -1);
 
-    std::string serialize();
+    jstring serialize(JNOSerializeFormat format = JNOSerializeFormat::JNOCompact);
 
     // Find node
     jno_object_node* at(const std::string& name);
@@ -98,6 +108,10 @@ class jno_object_parser {
 jno_object_node& operator<<(jno_object_node& root, const jstring& nodename);
 
 jno_object_node& operator<<(jno_object_parser& root, const jstring& nodename);
+
+std::ostream& operator <<(std::ostream &, const jno_object_node&);
+
+std::ostream& operator <<(std::ostream &, const jno_object_parser&);
 
 int jno_string_to_hash_fast(const char* str, int len = INT32_MAX);
 

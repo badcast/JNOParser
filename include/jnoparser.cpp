@@ -21,6 +21,7 @@ static const struct {
     char jno_false_string[6] = MACROPUT(false);
     char jno_null_string[5] = "null";
     char jno_array_segments[2]{'{', '}'};
+    char jno_unknown_string[6]{"{...}"};
     char jno_trim_segments[5]{32, '\t', '\n', '\r', '\v'};
     char jno_valid_property_name[3] = {'A', 'z', '_'};
 } jno_syntax;
@@ -330,6 +331,8 @@ method JNOType jno_object_node::type() { jno_get_type(handle, static_cast<jno_st
 
 method jno_object_node* jno_object_node::tree(const jstring& child) { return nullptr; }
 
+method jbool jno_object_node::has_tree() const { throw std::runtime_error("This is method not implemented"); }
+
 method const jstring jno_object_node::name() const { return jstring(static_cast<char*>(handle)); }
 
 method int jno_avail_only(jno_evaluated& eval, const char* source, int length, int depth) {
@@ -477,7 +480,7 @@ method int jno_avail(jstruct& entry, jno_evaluated& eval, const char* source, in
     int x, y;
     JNOType valueType;
     JNOType current_block_type;
-    struct propery_node {
+    struct property_node {
         jstring propertyName;
         void* data;
     };
@@ -495,7 +498,7 @@ method int jno_avail(jstruct& entry, jno_evaluated& eval, const char* source, in
         // check property name
         if (!jno_valid_property_name(pointer + y, x - y)) throw std::bad_exception();
         prototype_node = {};
-        prototype_node.propertyName.append(pointer + y, static_cast<size_t>(x - y));
+        prototype_node.propertyName.append(pointer + y, static_cast<size_t>(x - y)); // set property name
         // has comment line
         x += jno_skip_comment(pointer + x, length - x);
         x += jno_trim(pointer + x, length - x);  // trim string
@@ -511,7 +514,8 @@ method int jno_avail(jstruct& entry, jno_evaluated& eval, const char* source, in
                     if (pointer[x] == jno_syntax.jno_obstacle)
                         ++x;
                     else {
-                        x += jno_get_format(pointer + x, &pointer, valueType);
+                        void* memory;
+                        x += jno_get_format(pointer + x, &memory, valueType);
                         if (valueType != JNOType::Unknown) {
                             if (current_block_type == JNOType::Unknown) {
                                 current_block_type = valueType;
@@ -607,9 +611,9 @@ method int jno_avail(jstruct& entry, jno_evaluated& eval, const char* source, in
             }
             ++x;
         } else {  // get also value
-            x += jno_get_format(pointer + x, &pointer, valueType);
-            prototype_node.set_native_memory(pointer);
-            pointer = nullptr;
+            x += jno_get_format(pointer + x, &memory, valueType);
+            prototype_node.set_native_memory(memory);
+            memory = nullptr;
             // prototype_node.flags = Node_ValueFlag | valueType << 2;
         }
 
@@ -632,22 +636,29 @@ ur/target/direct                _dbgLastNode = &_curIter->second;
 method void jno_object_parser::deserialize_from(const char* filename) {
     long length;
     char* buffer;
-
     std::ifstream file;
 
+    // try open file
     file.open(filename);
 
+    // has error from open
     if (!file) throw std::runtime_error("error open file");
 
+    // read length
     length = file.seekg(0, std::ios::end).tellg();
     file.seekg(0, std::ios::beg);
 
+    // check buffer
     if ((buffer = (char*)malloc(length)) == nullptr) throw std::bad_alloc();
-
-    memset(buffer, 0, length);
+    // set buffer to zero
+    std::memset(buffer, 0, length);
+    // read
     length = file.read(buffer, length).gcount();
+    // close file
     file.close();
+    // deserialize
     deserialize((char*)buffer, length);
+    // free buffer
     free(buffer);
 }
 method void jno_object_parser::deserialize(const jstring& source) { deserialize(source.data(), source.size()); }
@@ -657,19 +668,30 @@ method void jno_object_parser::deserialize(const char* source, int len) {
     entry.clear();  // clears alls
     jno_avail_only(eval, source, len, 0);
 }
-method jstring jno_object_parser::serialize() {
+method jstring jno_object_parser::serialize(JNOSerializeFormat format) {
     jstring data;
     throw std::runtime_error("no complete");
+
+    if (format == JNOBeautify) {
+        data += "//@Just Node Object Version: 1.0.0\n";
+    }
+
+    jstruct* entry;
+
+    // Write structure block
+
     return data;
 }
-method jno_object_node* jno_object_parser::at(const jstring& name) {
-    jno_object_node* node = nullptr;
+method jno_object_node* jno_object_parser::find_node(const jstring& name) {
+    jno_object_node* node;
     int hash = jno_string_to_hash_fast(name.c_str());
 
     auto iter = this->entry.find(hash);
 
-    if (iter != std::end(this->entry)) node = &iter->second;
-
+    if (iter != std::end(this->entry))
+        node = &iter->second;
+    else
+        node = nullptr;
     return node;
 }
 
@@ -677,33 +699,34 @@ method jno_object_node* jno_object_parser::tree(const jstring& nodename) { retur
 
 method jstruct& jno_object_parser::get_struct() { return entry; }
 
-method jno_object_node* jno_object_parser::find_node(const jstring& nodePath) {
+method jno_object_node* jno_object_parser::at(const jstring& nodePath) {
     jno_object_node* node = nullptr;
     std::add_pointer<decltype(this->entry)>::type entry = &this->entry;
     decltype(entry->begin()) iter;
-    int l, r;
+    int alpha, delta;
     int hash;
 
-    // set l as 0
-    l ^= l;
+    // set l to 0 (zero value).
+    // NOTE: Alternative answer for new method.
+    alpha ^= alpha;
 
     // get splits
     do {
-        if ((r = nodePath.find(jno_syntax.jno_nodePathBreaker, l)) == ~0) r = static_cast<int>(nodePath.length());
-        hash = jno_string_to_hash_fast(nodePath.c_str() + l, r - l);
+        if ((delta = nodePath.find(jno_syntax.jno_nodePathBreaker, alpha)) == ~0) delta = static_cast<int>(nodePath.length());
+        hash = jno_string_to_hash_fast(nodePath.c_str() + alpha, delta - alpha);
         iter = entry->find(hash);
         if (iter != end(*entry)) {
-            if (iter->second.isStruct())
+            if (iter->second.has_tree())
                 entry = nullptr;  // decltype(entry)(iter->second._bits);
             else {
-                if (r == nodePath.length()) node = &iter->second;  // get the next section
+                if (delta == nodePath.length()) node = &iter->second;  // get the next section
                 break;
             }
         }
-        l = ++r;
-        r = nodePath.length();
+        alpha = ++delta;
+        delta = nodePath.length();
 
-    } while (l < r);
+    } while (alpha < delta);
     return node;
 }
 
@@ -711,6 +734,39 @@ method jbool jno_object_parser::contains(const jstring& nodePath) { return find_
 
 method jno_object_node& operator<<(jno_object_node& root, const jstring& nodename) { return *root.tree(nodename); }
 method jno_object_node& operator<<(jno_object_parser& root, const jstring& nodename) { return *root.tree(nodename); }
+
+method std::ostream& operator<<(std::ostream& out, const jno_object_node& node) {
+    switch (node.type()) {
+        case JNOType::JNONumber:
+            out << node.value<jnumber>();
+            break;
+        case JNOType::JNOBoolean:
+            out << node.value<jbool>();
+            break;
+        case JNOType::JNOReal:
+            out << node.value<jreal>();
+            break;
+        case JNOType::JNOString:
+            out << node.value<jstring>();
+            break;
+        case JNOType::Unknown:
+            out << jno_syntax.jno_unknown_string;
+            break;
+        case JNOType::Null:
+            out << jno_syntax.jno_null_string;
+            break;
+    }
+
+    return out;
+}
+
+method std::ostream& operator<<(std::ostream& out, const jno_object_parser& parser) {
+    if (false)
+        out << jno_syntax.jno_unknown_string;
+    else
+        out << parser.serialize();
+    return out;
+}
 
 }  // namespace jno
 
