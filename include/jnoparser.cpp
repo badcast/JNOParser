@@ -5,6 +5,8 @@
 
 #define method
 
+#define MACROPUT(base) #base
+
 namespace jno {
 
 static const struct {
@@ -15,8 +17,8 @@ static const struct {
     char jno_left_seperator = '\\';
     char jno_eol_segment = '\n';
     char jno_format_string = '\"';
-    char jno_true_string[5] = "true";
-    char jno_false_string[6] = "false";
+    char jno_true_string[5] = MACROPUT(true);
+    char jno_false_string[6] = MACROPUT(false);
     char jno_null_string[5] = "null";
     char jno_array_segments[2]{'{', '}'};
     char jno_trim_segments[5]{32, '\t', '\n', '\r', '\v'};
@@ -713,3 +715,4 @@ method jno_object_node& operator<<(jno_object_parser& root, const jstring& noden
 }  // namespace jno
 
 #undef method
+#undef MACROPUT
