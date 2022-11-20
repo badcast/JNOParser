@@ -1,5 +1,5 @@
 // C++ code
-//  Project: JNO (Just Object Node) for effective structuring data. Save and Load for view. Analog JSON
+//  Project: just-parser (Just Object Node Parser) for effective structuring data. Save and Load for view. Analog JSON
 //  author: badcast <lmecomposer@gmail.com>
 //  github: github.com/badcast/just-parser
 //  soundcloud: soundcloud.com/light-mister
@@ -13,9 +13,9 @@
 #include <fstream>
 #include <stdexcept>
 
-namespace jno {
-class jno_object_parser;
-class jno_object_node;
+namespace just {
+class just_object_parser;
+class just_object_node;
 
 /// undefined type
 typedef void* jvariant;
@@ -28,42 +28,42 @@ typedef double jreal;
 /// logical type
 typedef bool jbool;
 
-using jstruct = std::map<int, jno_object_node>;
+using jstruct = std::map<int, just_object_node>;
 
-enum JNOSerializeFormat {
-    // JNO (Just Node Object) a beautify string view
-    JNOBeautify,
-    // JNO (Just Node Object) a compact strting data for effective communication
-    JNOCompact
+enum JustSerializeFormat {
+    // Just (Just Node Object) a beautify string view
+    JustBeautify,
+    // Just (Just Node Object) a compact strting data for effective communication
+    JustCompact
 };
 
-enum JNOAllocationMethod {
+enum JustAllocationMethod {
     // dynamic type: dynamic deserialization fast and plump loading
     dynamic_allocation,
     // fixed type: memory saving, reloading by the "evaluation-conclusion"
     fixed_allocation
 };
 
-/* standart JNO types */
-enum JNOType : std::uint8_t { Null = 255, Unknown = 0, JNOBoolean, JNONumber, JNOReal, JNOString };
+/* standart Just types */
+enum JustType : std::uint8_t { Null = 255, Unknown = 0, JustBoolean, JustNumber, JustReal, JustString };
 
-class jno_object_node {
-    friend class jno_object_parser;
+class just_object_node {
+    friend class just_object_parser;
 
-    jno_object_parser* owner;
+    just_object_parser* owner;
     jvariant var = nullptr;
 
-    jno_object_node(jno_object_parser* head, void* handle);
+    just_object_node(just_object_parser* head, void* handle);
 
    public:
     // Property 'name' it is Node
     const jstring name() const;
 
     // Property 'type' for get type
-    JNOType type();
+    JustType type();
 
     // Property 'tree' for get child
-    jno_object_node* tree(const jstring& child);
+    just_object_node* tree(const jstring& child);
 
     // Property 'has_tree' defined tree
     jbool has_tree() const;
@@ -82,17 +82,17 @@ class jno_object_node {
     explicit operator jbool();
 };
 
-class jno_object_parser {
-    friend class jno_object_node;
+class just_object_parser {
+    friend class just_object_node;
 
    protected:
     void* _storage;
     jstruct entry;
 
    public:
-    jno_object_parser(JNOAllocationMethod allocationMethod = JNOAllocationMethod::dynamic_allocation);
-    jno_object_parser(const jno_object_parser&) = delete;
-    virtual ~jno_object_parser();
+    just_object_parser(JustAllocationMethod allocationMethod = JustAllocationMethod::dynamic_allocation);
+    just_object_parser(const just_object_parser&) = delete;
+    virtual ~just_object_parser();
 
     void deserialize_from(const char* filename);
     void deserialize(const std::string& source);
@@ -100,35 +100,35 @@ class jno_object_parser {
     void deserialize(const std::string& content, int depth = -1);
 
     // Serialize as string format (text structured data)
-    jstring serialize(JNOSerializeFormat format = JNOSerializeFormat::JNOCompact);
+    jstring serialize(JustSerializeFormat format = JustSerializeFormat::JustCompact);
 
     // Find node from childrens
     // example, "First/Second/Triple" -> Node
     // for has a node, contains method use.
-    jno_object_node* at(const std::string& name);
+    just_object_node* at(const std::string& name);
 
     // Find node
-    jno_object_node* find_node(const std::string& nodePath);
+    just_object_node* find_node(const std::string& nodePath);
 
     // search node by name or prefix value, example
-    jno_object_node* search(const std::string& name);
+    just_object_node* search(const std::string& name);
 
     // result of occupied memory forevery nodes
     jnumber occupied_memory();
 
-    jnumber occupied_memory(JNOType box);
+    jnumber occupied_memory(JustType box);
 
     bool contains(const std::string& nodePath);
 
-    jno_object_node* tree(const jstring& child);
+    just_object_node* tree(const jstring& child);
 };
 
-jno_object_node& operator<<(jno_object_node&, const jstring&);
+just_object_node& operator<<(just_object_node&, const jstring&);
 
-jno_object_node& operator<<(jno_object_parser&, const jstring&);
+just_object_node& operator<<(just_object_parser&, const jstring&);
 
-std::ostream& operator<<(std::ostream&, const jno_object_node&);
+std::ostream& operator<<(std::ostream&, const just_object_node&);
 
-std::ostream& operator<<(std::ostream&, const jno_object_parser&);
+std::ostream& operator<<(std::ostream&, const just_object_parser&);
 
-}  // namespace jno
+}  // namespace just

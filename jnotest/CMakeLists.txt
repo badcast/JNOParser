@@ -1,10 +1,8 @@
-project(just-parser-test LANGUAGES CXX)
-
 file(GLOB TARGET_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/*.hpp" "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp")
 add_executable(just-test ${TARGET_SOURCES})
 
-set(JNOFILEINPUT "syntax.jno")
-set(DESTINATION_JNOFILE "${CMAKE_CURRENT_BINARY_DIR}/${JNOFILEINPUT}")
-file(CREATE_LINK "${CMAKE_CURRENT_SOURCE_DIR}/${JNOFILEINPUT}" ${DESTINATION_JNOFILE} SYMBOLIC)
+set(JustFILEINPUT "syntax.just")
+set(DESTINATION_JustFILE "${CMAKE_CURRENT_BINARY_DIR}/${JustFILEINPUT}")
+file(CREATE_LINK "${CMAKE_CURRENT_SOURCE_DIR}/${JustFILEINPUT}" ${DESTINATION_JustFILE} SYMBOLIC)
 
-target_link_libraries(just-tests libjust)
+target_link_libraries(just-test libjust)
