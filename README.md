@@ -1,4 +1,4 @@
-# JNOParser
+# just-parser
  Just Node Object Parser
 
 //Syntax    view 
