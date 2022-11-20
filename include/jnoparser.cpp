@@ -19,9 +19,9 @@ static const struct {
     char jno_format_string = '\"';
     char jno_true_string[5] = MACROPUT(true);
     char jno_false_string[6] = MACROPUT(false);
-    char jno_null_string[5] = "null";
+    char jno_null_string[5] = MACROPUT(null);
     char jno_array_segments[2]{'{', '}'};
-    char jno_unknown_string[6]{"{...}"};
+    char jno_unknown_string[6]{MACROPUT({...})};
     char jno_trim_segments[5]{32, '\t', '\n', '\r', '\v'};
     char jno_valid_property_name[3] = {'A', 'z', '_'};
 } jno_syntax;
@@ -49,7 +49,8 @@ enum { Node_ValueFlag = 1, Node_ArrayFlag = 2, Node_StructFlag = 3 };
 */
 
 struct jno_storage {
-    // up members: meta-info
+    // up members  : meta-info
+    // down members: size-info
     jnumber numBools, numNumbers, numReals, numStrings, numProperties, arrayBools, arrayNumbers, arrayReals, arrayStrings;
 };
 
@@ -112,6 +113,49 @@ inline void jfree(T* pointer) {
 }
 
 inline void jfree(void* pointer) { std::free(pointer); }
+
+template <typename T>
+struct get_type {
+    static constexpr JNOType type = JNOType::Unknown;
+};
+
+template <>
+struct get_type<int> {
+    static constexpr JNOType type = JNOType::JNONumber;
+};
+
+template <>
+struct get_type<float> {
+    static constexpr JNOType type = JNOType::JNOReal;
+};
+
+template <>
+struct get_type<double> {
+    static constexpr JNOType type = JNOType::JNOReal;
+};
+
+template <>
+struct get_type<bool> {
+    static constexpr JNOType type = JNOType::JNOBoolean;
+};
+
+template <>
+struct get_type<jstring> {
+    static constexpr JNOType type = JNOType::JNOString;
+};
+
+template <>
+struct get_type<const char*> {
+    static constexpr JNOType type = JNOType::JNOString;
+};
+
+template<typename T>
+void storage_alloc(jno_storage* pstore, const T& value) {
+
+    if(pstore ==nullptr)
+        throw std::bad_alloc;
+
+}
 
 // method for get type from pointer (storage required)
 method JNOType jno_get_type(const void* pointer, jno_storage* pstorage) {
@@ -641,7 +685,6 @@ ur/target/direct                _dbgLastNode = &_curIter->second;
 }
 
 method void jno_object_parser::deserialize_from(const char* filename) {
-
     long length;
     char* buffer;
     std::ifstream file;
@@ -672,14 +715,12 @@ method void jno_object_parser::deserialize_from(const char* filename) {
 method void jno_object_parser::deserialize(const jstring& source) { deserialize(source.data(), source.size()); }
 
 method void jno_object_parser::deserialize(const char* source, int len) {
-
     // FIXME: CLEAR FUNCTION IS UPGRADE
     jno_evaluated eval = {};
     entry.clear();  // clears alls
     jno_avail_only(eval, source, len, 0);
 }
 method jstring jno_object_parser::serialize(JNOSerializeFormat format) {
-
     jstring data;
     throw std::runtime_error("no complete");
 

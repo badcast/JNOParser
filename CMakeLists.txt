@@ -1,6 +1,6 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.0)
 
-project(JNOParser LANGUAGES CXX)
+project(just LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -10,7 +10,12 @@ enable_testing()
 
 include_directories(include)
 
+#find sources for compiling
 file(GLOB TARGET_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/include/jnoparser" "${CMAKE_CURRENT_SOURCE_DIR}/include/*.cpp")
-add_library(jnolib STATIC ${TARGET_SOURCES})
-target_include_directories(jnolib INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
+add_library(libjust STATIC ${TARGET_SOURCES})
+
+#target include <...>
+target_include_directories(libjust INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
+
+#set add test
 add_subdirectory(jnotest)
