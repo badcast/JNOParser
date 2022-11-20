@@ -18,4 +18,4 @@ add_library(libjust STATIC ${TARGET_SOURCES})
 target_include_directories(libjust INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
 
 #set add test
-add_subdirectory(justtest)
+add_subdirectory(jnotest)
