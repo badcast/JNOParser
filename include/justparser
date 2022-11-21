@@ -50,6 +50,7 @@ enum JustType : std::uint8_t { Null = 255, Unknown = 0, JustBoolean, JustNumber,
 class just_object_node {
     friend class just_object_parser;
 
+   protected:
     just_object_parser* owner;
     jvariant var = nullptr;
 
@@ -60,7 +61,7 @@ class just_object_node {
     const jstring name() const;
 
     // Property 'type' for get type
-    JustType type();
+    JustType type() const;
 
     // Property 'tree' for get child
     just_object_node* tree(const jstring& child);
@@ -76,10 +77,10 @@ class just_object_node {
 
     /* operators */
 
-    explicit operator jstring();
-    explicit operator jnumber();
-    explicit operator jreal();
-    explicit operator jbool();
+    explicit operator jstring() const;
+    explicit operator jnumber() const;
+    explicit operator jreal() const;
+    explicit operator jbool() const;
 };
 
 class just_object_parser {
@@ -100,7 +101,7 @@ class just_object_parser {
     void deserialize(const std::string& content, int depth = -1);
 
     // Serialize as string format (text structured data)
-    jstring serialize(JustSerializeFormat format = JustSerializeFormat::JustCompact);
+    jstring serialize(JustSerializeFormat format = JustSerializeFormat::JustCompact) const;
 
     // Find node from childrens
     // example, "First/Second/Triple" -> Node

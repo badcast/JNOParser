@@ -20,8 +20,8 @@ static const struct {
     char just_true_string[5] = MACROPUT(true);
     char just_false_string[6] = MACROPUT(false);
     char just_null_string[5] = MACROPUT(null);
-    char just_array_segments[2]{'{', '}'};
     char just_unknown_string[6]{MACROPUT({...})};
+    char just_array_segments[2]{'{', '}'};
     char just_trim_segments[5]{32, '\t', '\n', '\r', '\v'};
     char just_valid_property_name[3] = {'A', 'z', '_'};
 } just_syntax;
@@ -45,12 +45,15 @@ enum { Node_ValueFlag = 1, Node_ArrayFlag = 2, Node_StructFlag = 3 };
     ISSUE:
     - Organize structure malloc (realloc)
     - Tree for node
+        - How to get answer ? First use unsigned int as pointer in linear.
 
 */
 
 struct just_storage {
     // up members  : meta-info
     // down members: size-info
+
+
     jnumber numBools, numNumbers, numReals, numStrings, numProperties, arrayBools, arrayNumbers, arrayReals, arrayStrings;
 };
 
@@ -149,12 +152,25 @@ struct get_type<const char*> {
     static constexpr JustType type = JustType::JustString;
 };
 
-template<typename T>
-void storage_alloc(just_storage* pstore, const T& value) {
+template <typename T>
+jvariant storage_alloc(just_storage* pstore, const T& value) {
+    JustType type;
+    if (pstore == nullptr) throw std::bad_alloc();
 
-    if(pstore ==nullptr)
-        throw std::bad_alloc;
+    type = get_type<T>::type;
 
+    if(type == JustType::Unknown || type == JustType::Null)
+        return nullptr;
+
+
+}
+
+// method for fast get hash from string
+method inline int just_string_to_hash_fast(const char* content, int contentLength = INT32_MAX) {
+    int x = 1, y;
+    y ^= y;
+    while (*(content) && y++ < contentLength) x *= *content;
+    return x;
 }
 
 // method for get type from pointer (storage required)
@@ -254,7 +270,7 @@ method int just_get_format(const char* content, void** mem, JustType& out) {
 method inline jbool just_has_datatype(const char* content) {
     JustType type;
     just_get_format(const_cast<char*>(content), nullptr, type);
-    return type != JustType::Unknown;
+    return type != JustType::Unknown && type < JustType::Null;
 }
 
 // method for trim
@@ -363,27 +379,20 @@ method jbool just_is_array(const char* content, int& endpoint, int contentLength
     return result;
 }
 
-method inline int just_string_to_hash_fast(const char* content, int contentLength) {
-    int x = 1, y;
-    y ^= y;
-    while (*(content) && y++ < contentLength) x *= *content;
-    return x;
-}
-
 // Just Object Node
 
-just_object_node::just_object_node(just_object_parser* head, void* handle) {
-    this->head = head;
-    this->handle = handle;
+just_object_node::just_object_node(just_object_parser* owner, void* handle) {
+    this->owner = owner;
+    this->var = handle;
 }
 
-method JustType just_object_node::type() { just_get_type(handle, static_cast<just_storage*>(this->head->_storage)); }
+method JustType just_object_node::type() const { just_get_type(var, static_cast<just_storage*>(this->owner->_storage)); }
 
 method just_object_node* just_object_node::tree(const jstring& child) { return nullptr; }
 
 method jbool just_object_node::has_tree() const { throw std::runtime_error("This is method not implemented"); }
 
-method const jstring just_object_node::name() const { return jstring(static_cast<char*>(handle)); }
+method const jstring just_object_node::name() const { return jstring(static_cast<char*>(var)); }
 
 method int just_avail_only(just_evaluated& eval, const char* source, int length, int depth) {
     int x, y, z;
@@ -423,7 +432,7 @@ method int just_avail_only(just_evaluated& eval, const char* source, int length,
                     else {
                         x += z = just_get_format(pointer + x, nullptr, valueType);
 
-                        // Just current value Type
+                        // Just Node Object current value Type
 
                         if (valueType != JustType::Unknown) {
                             if (current_block_type == JustType::Unknown) {
@@ -528,6 +537,7 @@ method int just_avail_only(just_evaluated& eval, const char* source, int length,
 // divide and conquer method avail
 method int just_avail(jstruct& entry, just_evaluated& eval, const char* source, int length, int depth) {
     int x, y;
+    void* memory;
     JustType valueType;
     JustType current_block_type;
     const char* pointer;
@@ -565,7 +575,6 @@ method int just_avail(jstruct& entry, just_evaluated& eval, const char* source, 
                     if (pointer[x] == just_syntax.just_obstacle)
                         ++x;
                     else {
-                        void* memory;
                         x += just_get_format(pointer + x, &memory, valueType);
                         if (valueType != JustType::Unknown) {
                             if (current_block_type == JustType::Unknown) {
@@ -720,7 +729,7 @@ method void just_object_parser::deserialize(const char* source, int len) {
     entry.clear();  // clears alls
     just_avail_only(eval, source, len, 0);
 }
-method jstring just_object_parser::serialize(JustSerializeFormat format) {
+method jstring just_object_parser::serialize(JustSerializeFormat format) const {
     jstring data;
     throw std::runtime_error("no complete");
 
@@ -748,8 +757,6 @@ method just_object_node* just_object_parser::find_node(const jstring& name) {
 }
 
 method just_object_node* just_object_parser::tree(const jstring& nodename) { return at(nodename); }
-
-method jstruct& just_object_parser::get_struct() { return entry; }
 
 method just_object_node* just_object_parser::at(const jstring& nodePath) {
     just_object_node* node = nullptr;
