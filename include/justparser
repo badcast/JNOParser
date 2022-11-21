@@ -45,7 +45,7 @@ enum JustAllocationMethod {
 };
 
 /* standart Just types */
-enum JustType : std::uint8_t { Null = 255, Unknown = 0, JustBoolean, JustNumber, JustReal, JustString };
+enum JustType : std::uint8_t { Null = 0, Unknown, JustBoolean, JustNumber, JustReal, JustString };
 
 class just_object_node {
     friend class just_object_parser;

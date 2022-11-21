@@ -53,7 +53,6 @@ struct just_storage {
     // up members  : meta-info
     // down members: size-info
 
-
     jnumber numBools, numNumbers, numReals, numStrings, numProperties, arrayBools, arrayNumbers, arrayReals, arrayStrings;
 };
 
@@ -123,6 +122,11 @@ struct get_type {
 };
 
 template <>
+struct get_type<void> {
+    static constexpr JustType type = JustType::Null;
+};
+
+template <>
 struct get_type<int> {
     static constexpr JustType type = JustType::JustNumber;
 };
@@ -159,10 +163,7 @@ jvariant storage_alloc(just_storage* pstore, const T& value) {
 
     type = get_type<T>::type;
 
-    if(type == JustType::Unknown || type == JustType::Null)
-        return nullptr;
-
-
+    if (type <= JustType::Unknown) return nullptr;
 }
 
 // method for fast get hash from string
