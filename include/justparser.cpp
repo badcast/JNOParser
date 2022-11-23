@@ -1,5 +1,7 @@
 #include <cstdlib>
 #include <limits>
+#include <tuple>
+#include <sys/user.h>
 
 #include "justparser"
 
@@ -27,10 +29,61 @@ static const struct {
 } just_syntax;
 
 // TODO: Get status messages
-// static const struct { const char* msg_multitype_cast = ""; } just_error_messages;
+// static const struct { const char* msg_multitype_cast = ""; } just_error_msg;
 
 enum { Node_ValueFlag = 1, Node_ArrayFlag = 2, Node_StructFlag = 3 };
 
+template <typename T>
+struct get_type {
+    static constexpr JustType type = JustType::Unknown;
+};
+
+template <>
+struct get_type<void> {
+    static constexpr JustType type = JustType::Null;
+};
+
+template <>
+struct get_type<int> {
+    static constexpr JustType type = JustType::JustNumber;
+};
+
+template <>
+struct get_type<float> {
+    static constexpr JustType type = JustType::JustReal;
+};
+
+template <>
+struct get_type<double> {
+    static constexpr JustType type = JustType::JustReal;
+};
+
+template <>
+struct get_type<bool> {
+    static constexpr JustType type = JustType::JustBoolean;
+};
+
+template <>
+struct get_type<jstring> {
+    static constexpr JustType type = JustType::JustString;
+};
+
+template <>
+struct get_type<const char*> {
+    static constexpr JustType type = JustType::JustString;
+};
+
+method inline int just_get_size(JustType type) {
+    switch (type) {
+        case JustType::JustBoolean:
+            return sizeof(jbool);
+        case JustType::JustNumber:
+            return sizeof(jnumber);
+        case JustType::JustReal:
+            return sizeof(jreal);
+    }
+    return 0;
+}
 // NOTE: storage description
 /*
     index  |types
@@ -52,7 +105,7 @@ enum { Node_ValueFlag = 1, Node_ArrayFlag = 2, Node_StructFlag = 3 };
 struct just_storage {
     // up members  : meta-info
     // down members: size-info
-
+    std::uint8_t just_allocated;
     jnumber numBools, numNumbers, numReals, numStrings, numProperties, arrayBools, arrayNumbers, arrayReals, arrayStrings;
 };
 
@@ -116,72 +169,68 @@ inline void jfree(T* pointer) {
 
 inline void jfree(void* pointer) { std::free(pointer); }
 
-template <typename T>
-struct get_type {
-    static constexpr JustType type = JustType::Unknown;
-};
-
-template <>
-struct get_type<void> {
-    static constexpr JustType type = JustType::Null;
-};
-
-template <>
-struct get_type<int> {
-    static constexpr JustType type = JustType::JustNumber;
-};
-
-template <>
-struct get_type<float> {
-    static constexpr JustType type = JustType::JustReal;
-};
-
-template <>
-struct get_type<double> {
-    static constexpr JustType type = JustType::JustReal;
-};
-
-template <>
-struct get_type<bool> {
-    static constexpr JustType type = JustType::JustBoolean;
-};
-
-template <>
-struct get_type<jstring> {
-    static constexpr JustType type = JustType::JustString;
-};
-
-template <>
-struct get_type<const char*> {
-    static constexpr JustType type = JustType::JustString;
-};
-
-template <typename T>
-jvariant storage_alloc(just_storage* pstore, const T& value) {
-    JustType type;
-    if (pstore == nullptr) throw std::bad_alloc();
-
-    type = get_type<T>::type;
-
-    if (type <= JustType::Unknown) return nullptr;
+method inline just_storage* storage_init() {
+    constexpr auto _storageMinimum_SIZE = sizeof(just_storage) > PAGE_SIZE ? sizeof(just_storage) : PAGE_SIZE;
+    return static_cast<just_storage*>(std::memset(std::malloc(_storageMinimum_SIZE), 0, _storageMinimum_SIZE));
 }
 
-// method for fast get hash from string
-method inline int just_string_to_hash_fast(const char* content, int contentLength = INT32_MAX) {
-    int x = 1, y;
-    y ^= y;
-    while (*(content) && y++ < contentLength) x *= *content;
-    return x;
+method std::tuple<int, int> storage_calc_size(just_storage* pstorage) {
+    int calcSize, spaceSize;
+    jnumber* alpha = static_cast<jnumber*>(static_cast<void*>(pstorage) + sizeof(pstorage->just_allocated));
+    jnumber* delta = reinterpret_cast<jnumber*>(pstorage + 1);
+    for (; alpha < delta; ++alpha) {
+        // set next pointer
+        delta += static_cast<std::uint32_t>(*alpha >> 32);  // high (bytes)
+    }
+    return std::make_tuple(calcSize, spaceSize);
+}
+
+method jvariant storage_alloc_get(just_storage** pstore, JustType type, int allocSize = ~0) {
+#define store (*pstore)
+    if (pstore == nullptr || *pstore == nullptr) throw std::bad_alloc();
+
+    if ((*pstore)->just_allocated) {
+        throw std::runtime_error("storage state an optimized");
+    }
+
+    auto calc = storage_calc_size(*pstore);
+
+    void* _vault = store + 1;
+
+    if (allocSize < 0) allocSize = just_get_size(type);
+
+    switch (type) {
+        case JustType::JustBoolean:
+
+            _vault = std::realloc(_vault, allocSize);
+            ++store->numBools;
+        case JustType::JustNumber:
+            ++store->numNumbers;
+        case JustType::JustReal:
+            ++store->numReals;
+        case JustType::JustString:
+            ++store->numStrings;
+        case JustType::Unknown:
+        case JustType::Null:
+            throw std::bad_cast();
+    }
+#undef store
+}
+
+method bool storage_optimize(just_storage** pstorage) {
+    if ((*pstorage)->just_allocated) return true;
+
+    // TODO: opimize there are
 }
 
 // method for get type from pointer (storage required)
 method JustType just_get_type(const void* pointer, just_storage* pstorage) {
-    const jnumber* alpha = reinterpret_cast<jnumber*>(pstorage);
+    const jnumber* alpha = static_cast<jnumber*>(static_cast<void*>(pstorage) + sizeof(pstorage->just_allocated));
     const void* delta = pstorage + 1;
     int type;
     if (pointer) {
         type = JustType::Unknown;
-        for (; pointer < delta; ++alpha) {
+        for (; alpha < delta; ++alpha) {
             // get type
             ++type;
             // set next pointer
@@ -193,6 +242,16 @@ method JustType just_get_type(const void* pointer, just_storage* pstorage) {
 
     return static_cast<JustType>(type);
 }
+
+// method for fast get hash from string
+method inline int just_string_to_hash_fast(const char* content, int contentLength = INT32_MAX) {
+    int x, y;
+    x = x == x;  // set to one
+    y ^= y;      // set to zero
+    while (*(content) && y++ < contentLength) x *= *content;
+    return x;
+}
+
 // method for check valid a unsigned number
 method inline bool just_is_unsigned_jnumber(const char character) { return std::isdigit(character); }
 
@@ -226,7 +285,7 @@ method inline jbool just_is_jbool(const char* content, int* getLength) {
 // method for get format from raw content, also to write in mem pointer
 method int just_get_format(const char* content, void** mem, JustType& out) {
     int offset;
-    size_t i;
+    size_t x;
 
     offset ^= offset;  // set to zero
 
@@ -242,9 +301,9 @@ method int just_get_format(const char* content, void** mem, JustType& out) {
             if (mem) {
                 jstring str;
                 str.reserve(offset);
-                for (i ^= i; i < offset; ++i) {
-                    if (content[i + 1] == just_syntax.just_left_seperator) ++i;
-                    str.push_back(content[i + 1]);
+                for (x ^= x; x < offset; ++x) {
+                    if (content[x + 1] == just_syntax.just_left_seperator) ++x;
+                    str.push_back(content[x + 1]);
                 }
                 *mem = static_cast<void*>(jalloc(jstring(str)));
             }
@@ -728,6 +787,13 @@ method void just_object_parser::deserialize(const char* source, int len) {
     // FIXME: CLEAR FUNCTION IS UPGRADE
     just_evaluated eval = {};
     entry.clear();  // clears alls
+
+    if (_storage) {
+        std::free(_storage);
+    }
+
+    // init storage
+    _storage = storage_init();
     just_avail_only(eval, source, len, 0);
 }
 method jstring just_object_parser::serialize(JustSerializeFormat format) const {
