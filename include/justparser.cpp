@@ -1,5 +1,4 @@
 #include <cstdlib>
-#include <limits>
 #include <tuple>
 #include "justparser"
 
@@ -351,8 +350,8 @@ method inline jbool just_has_datatype(const char* content) {
     return type != JustType::Unknown && type < JustType::Null;
 }
 
-// method for trim
-method int just_trim(const char* content, int contentLength = std::numeric_limits<int>::max()) {
+// method for trim tabs, space, EOL (etc) to skip.
+method int just_trim(const char* content, int contentLength = INT_MAX) {
     int x, y;
     x ^= x;
     if (content != nullptr)
@@ -371,7 +370,7 @@ method int just_trim(const char* content, int contentLength = std::numeric_limit
     return x;
 }
 
-method int just_skip(const char* c, int len = std::numeric_limits<int>::max()) {
+method int just_skip(const char* c, int len = INT_MAX) {
     int x, y;
     char skipping[sizeof(just_syntax.just_trim_segments) + sizeof(just_syntax.just_array_segments)];
     *skipping ^= *skipping;
@@ -400,22 +399,29 @@ method inline jbool just_valid_property_name(const char* abstractContent, int le
     return len != 0;
 }
 
-method inline jbool just_is_comment_line(const char* c, int len) { return len > 0 && !strncmp(c, just_syntax.just_commentLine, std::min(2, len)); }
+method inline jbool just_is_comment_line(const char* c, int len) { return len > 0 && !std::strncmp(c, just_syntax.just_commentLine, std::min(2, len)); }
 
-method inline int just_has_eol(const char* c, int len = std::numeric_limits<int>::max()) {
+method inline int just_has_eol(const char* c, int len = INT_MAX) {
     int x;
     for (x ^= x; *c && x < len && *c != just_syntax.just_eol_segment; ++x, ++c)
         ;
     return x;
 }
 
-method inline int just_skip_comment(const char* c, int len) {
-    int x = just_trim(c, len);
-    while (just_is_comment_line(c + x, len - x)) {
-        x += just_has_eol(c + x, len - x);
-        x += just_trim(c + x, len - x);
+// method for skip comment's
+method int just_autoskip_comment(const char* src, int len) {
+    int offset, skipped;
+    const char* pointer = src;
+    pointer += offset = just_trim(pointer, len - offset);
+    while (just_is_comment_line(pointer, len - offset)) {
+        // skip to EOL
+        pointer += skipped = just_has_eol(pointer, len - offset);
+        offset += skipped;
+        // trimming
+        pointer += skipped = just_trim(pointer, len - offset);
+        offset += skipped;
     }
-    return x;
+    return offset;
 }
 
 method inline jbool just_is_space(const char c) {
@@ -426,7 +432,7 @@ method inline jbool just_is_space(const char c) {
     return false;
 }
 
-method jbool just_is_array(const char* content, int& endpoint, int contentLength = std::numeric_limits<int>::max()) {
+method jbool just_is_array(const char* content, int& endpoint, int contentLength = INT_MAX) {
     int x;
     jbool result = false;
 
@@ -435,7 +441,7 @@ method jbool just_is_array(const char* content, int& endpoint, int contentLength
         ++x;
         x += just_trim(content + x);
 
-        x += just_skip_comment(content + x, contentLength - x);
+        x += just_autoskip_comment(content + x, contentLength - x);
         x += just_trim(content + x);
 
         if (just_has_datatype(content + x) || content[x] == just_syntax.just_array_segments[1]) {
@@ -479,7 +485,7 @@ method int just_avail_only(just_evaluated& eval, const char* source, int length,
 
     for (x ^= x; x < length;) {
         // has comment line
-        y = x += just_skip_comment(pointer + x, length - x);
+        y = x += just_autoskip_comment(pointer + x, length - x);
         if (depth > 0 && pointer[x] == just_syntax.just_array_segments[1]) break;
         x += just_skip(pointer + x, length - x);
 
@@ -490,7 +496,7 @@ method int just_avail_only(just_evaluated& eval, const char* source, int length,
         // prototype_node.propertyName.append(just_source + y, static_cast<size_t>(x - y));
 
         //  has comment line
-        x += just_skip_comment(pointer + x, length - x);
+        x += just_autoskip_comment(pointer + x, length - x);
         x += just_trim(pointer + x, length - x);  // trim string
         // is block or array
         if (pointer[x] == *just_syntax.just_array_segments) {
@@ -499,7 +505,7 @@ method int just_avail_only(just_evaluated& eval, const char* source, int length,
                 current_block_type = JustType::Unknown;
                 // prototype_node.flags = Node_ArrayFlag;
                 for (; x < y;) {
-                    x += just_skip_comment(pointer + x, y - x);
+                    x += just_autoskip_comment(pointer + x, y - x);
                     // next index
                     if (pointer[x] == just_syntax.just_obstacle)
                         ++x;
@@ -550,13 +556,13 @@ method int just_avail_only(just_evaluated& eval, const char* source, int length,
                             }
                         }
                     }
-                    x += just_skip_comment(pointer + x, y - x);
+                    x += just_autoskip_comment(pointer + x, y - x);
                 }
 
             } else {  // get the next node
                 ++x;
                 x += just_avail_only(eval, pointer + x, length - x, depth + 1);
-                x += just_skip_comment(pointer + x, length - x);
+                x += just_autoskip_comment(pointer + x, length - x);
             }
 
             if (pointer[x] != just_syntax.just_array_segments[1]) {
@@ -601,7 +607,7 @@ method int just_avail_only(just_evaluated& eval, const char* source, int length,
                 _dbgLastNode = &_curIter->second;
         #endif
         */
-        x += just_skip_comment(pointer + x, length - x);
+        x += just_autoskip_comment(pointer + x, length - x);
     }
 
     return x;
@@ -609,9 +615,8 @@ method int just_avail_only(just_evaluated& eval, const char* source, int length,
 
 // big algorithm, please free me.
 // divide and conquer method avail
-method int just_avail(jstruct& entry, just_evaluated& eval, const char* source, int length, int depth) {
+method int just_avail(just_storage** storage, just_evaluated& eval, const char* source, int length, int depth) {
     int x, y;
-    void* memory;
     JustType valueType;
     JustType current_block_type;
     const char* pointer;
@@ -627,7 +632,7 @@ method int just_avail(jstruct& entry, just_evaluated& eval, const char* source, 
 
     for (x ^= x; x < length;) {
         // has comment line
-        y = x += just_skip_comment(pointer + x, length - x);
+        y = x += just_autoskip_comment(pointer + x, length - x);
         if (depth > 0 && pointer[x] == just_syntax.just_array_segments[1]) break;
         x += just_skip(pointer + x, length - x);
         // check property name
@@ -635,7 +640,7 @@ method int just_avail(jstruct& entry, just_evaluated& eval, const char* source, 
         prototype_node = {};
         prototype_node.propertyName.append(pointer + y, static_cast<size_t>(x - y));  // set property name
         // has comment line
-        x += just_skip_comment(pointer + x, length - x);
+        x += just_autoskip_comment(pointer + x, length - x);
         x += just_trim(pointer + x, length - x);  // trim string
         // is block or array
         if (pointer[x] == *just_syntax.just_array_segments) {
@@ -644,12 +649,12 @@ method int just_avail(jstruct& entry, just_evaluated& eval, const char* source, 
                 current_block_type = JustType::Unknown;
                 // prototype_node.flags = Node_ArrayFlag;
                 for (; x < y;) {
-                    x += just_skip_comment(pointer + x, y - x);
+                    x += just_autoskip_comment(pointer + x, y - x);
                     // next index
                     if (pointer[x] == just_syntax.just_obstacle)
                         ++x;
                     else {
-                        x += just_get_format(pointer + x, &memory, valueType);
+                        x += just_get_format(pointer + x, storage, valueType);
                         if (valueType != JustType::Unknown) {
                             if (current_block_type == JustType::Unknown) {
                                 current_block_type = valueType;
@@ -707,7 +712,7 @@ method int just_avail(jstruct& entry, just_evaluated& eval, const char* source, 
                             }
                         }
                     }
-                    x += just_skip_comment(pointer + x, y - x);
+                    x += just_autoskip_comment(pointer + x, y - x);
                 }
 
                 // shrink to fit
@@ -734,33 +739,25 @@ method int just_avail(jstruct& entry, just_evaluated& eval, const char* source, 
             } else {  // get the next node
                 jstruct* _nodes = jalloc<jstruct>();
                 ++x;
-                x += just_avail(*_nodes, eval, pointer + x, length - x, depth + 1);
+                x += just_avail(storage, eval, pointer + x, length - x, depth + 1);
                 // prototype_node.flags = Node_StructFlag;
                 prototype_node.set_native_memory(_nodes);
-                x += just_skip_comment(pointer + x, length - x);
+                x += just_autoskip_comment(pointer + x, length - x);
             }
             if (pointer[x] != just_syntax.just_array_segments[1]) {
                 throw std::bad_exception();
             }
             ++x;
         } else {  // get also value
-            x += just_get_format(pointer + x, &memory, valueType);
+            x += just_get_format(pointer + x, storage, valueType);
             prototype_node.set_native_memory(memory);
             memory = nullptr;
             // prototype_node.flags = Node_ValueFlag | valueType << 2;
         }
 
         entry.insert(std::make_pair(y = just_string_to_hash_fast(prototype_node.propertyName.c_str()), prototype_node));
-        /*
-        #if defined(QDEBUG) || defined(DEBUG)
-                // get iter
-                auto _curIter = entry.find(j);
-                if ur/target/direct(_dbgLastNode) _dbgLastNode->nextNode = &_curIter->second;
-                _curIter->second.prevNode = _dbgLastNode;
-ur/target/direct                _dbgLastNode = &_curIter->second;
-        #endif
-            */
-        x += just_skip_comment(pointer + x, length - x);
+
+        x += just_autoskip_comment(pointer + x, length - x);
     }
 
     return x;
