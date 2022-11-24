@@ -77,7 +77,7 @@ struct get_type<const char*> {
     static constexpr JustType type = JustType::JustString;
 };
 
-method inline int just_get_size(JustType type) {
+method inline int just_type_size(const JustType type) {
     switch (type) {
         case JustType::JustBoolean:
             return sizeof(jbool);
@@ -153,26 +153,6 @@ struct just_evaluated {
     }
 };
 
-template <typename T>
-inline T* jalloc() {
-    return new T();  // static_cast<T*>(std::malloc(sizeof(T)));//RoninEngine::Runtime::GC::gc_alloc<T>();
-}
-
-template <typename T>
-inline T* jalloc(const T& copy) {
-    T* ptr = static_cast<T*>(std::malloc(sizeof(T)));  // RoninEngine::Runtime::GC::gc_alloc<T>(copy);
-    std::memcpy(ptr, &copy, sizeof(T));
-    return ptr;
-}
-
-template <typename T>
-inline void jfree(T* pointer) {
-    std::free(pointer);
-    // RoninEngine::Runtime::GC::gc_unalloc(pointer);
-}
-
-inline void jfree(void* pointer) { std::free(pointer); }
-
 method inline just_storage* storage_new_init() {
     jnumber _PAGE_SIZE;
 #if __unix__
@@ -195,10 +175,10 @@ method std::uint32_t storage_calc_size(const just_storage* pstorage, JustType ty
     if (!pstorage) throw std::runtime_error("Memory is undefined");
 
     if (type > JustType::Null) {
-        alpha = reinterpret_cast<const jnumber*>(static_cast<const void*>(pstorage) + sizeof(pstorage->just_allocated)) +
-                static_cast<int>(type);
+        alpha = reinterpret_cast<const jnumber*>(static_cast<const void*>(pstorage) + sizeof(pstorage->just_allocated)) + static_cast<int>(type);
         calcSize = (*alpha) >> 32;
     } else {
+        // set to zero
         calcSize ^= calcSize;
     }
 
@@ -220,7 +200,7 @@ method jvariant storage_alloc_get(just_storage** pstore, JustType type, int allo
 
     void* _vault = store + 1;
     int vaultSize;
-    if (allocSize <= 0) allocSize = just_get_size(type);
+    if (allocSize <= 0) allocSize = just_type_size(type);
 
     switch (type) {
         case JustType::JustBoolean:
@@ -305,46 +285,61 @@ method inline jbool just_is_jbool(const char* content, int* getLength) {
     return false;
 }
 
-// method for get format from raw content, also to write in mem pointer
-method int just_get_format(const char* content, void** mem, JustType& out) {
+// method for get format from raw content, also to write in storage pointer
+method int just_get_format(const char* content, just_storage** storage, JustType& containType) {
+    int x;
     int offset;
-    size_t x;
 
     offset ^= offset;  // set to zero
 
-    // string type
-    if (content == nullptr || *content == '\0')
-        out = JustType::Null;
-    else if (*content == just_syntax.just_format_string) {
-        ++offset;
-        for (; content[offset] != just_syntax.just_format_string; ++offset)
-            if (content[offset] == just_syntax.just_left_seperator && content[offset + 1] == just_syntax.just_format_string)
-                ++offset;
-        if (--offset) {
-            if (mem) {
-                jstring str;
-                str.reserve(offset);
-                for (x ^= x; x < offset; ++x) {
-                    if (content[x + 1] == just_syntax.just_left_seperator) ++x;
-                    str.push_back(content[x + 1]);
-                }
-                *mem = static_cast<void*>(jalloc(jstring(str)));
-            }
+    // Null type
+    if (content == nullptr || *content == '\0') {
+        containType = JustType::Null;
+    } else if (just_is_jbool(content, &offset)) {  // Bool type -----------------------------------------------------------------------------
+        containType = JustType::JustBoolean;
+        if (storage) {
+            jbool conv = (offset == sizeof(just_syntax.just_true_string) - 1);
+            // Copy to
+            std::memcpy(storage_alloc_get(storage, containType), &conv, just_type_size(containType));
         }
 
+    } else if (just_is_jnumber(*content)) {  // Number type ---------------------------------------------------------------------------------
+        containType = JustType::JustNumber;
+        if (storage) {
+            jnumber conv = std::atoll(content);
+            // Copy to
+            std::memcpy(storage_alloc_get(storage, containType), &conv, just_type_size(containType));
+        }
+    } else if (just_is_jreal(content, &offset)) {  // Real type -----------------------------------------------------------------------------
+        containType = JustType::JustReal;
+        if (storage) {
+            jreal conv = std::atof(content);
+            // Copy to
+            std::memcpy(storage_alloc_get(storage, containType), &conv, just_type_size(containType));
+        }
+    } else if (*content == just_syntax.just_format_string) {  // String type ----------------------------------------------------------------
+
+        ++offset;
+        for (; content[offset] != just_syntax.just_format_string; ++offset)
+            if (content[offset] == just_syntax.just_left_seperator && content[offset + 1] == just_syntax.just_format_string) ++offset;
+        containType = JustType::JustString;
+        if (--offset) {
+            if (storage) {
+                // TODO: Go support next for string. '\n' '\r' .etc.
+                jstring stringSyntax;
+                stringSyntax.reserve(offset);
+                for (x ^= x; x < offset; ++x) {
+                    if (content[x + 1] == just_syntax.just_left_seperator) ++x;
+                    stringSyntax.push_back(content[x + 1]);
+                }
+
+                // Copy to
+                std::memcpy(storage_alloc_get(storage, containType, stringSyntax.size()), stringSyntax.data(), stringSyntax.size());
+            }
+        }
         offset += 2;
-        out = JustType::JustString;
-    } else if (just_is_jreal(content, &offset)) {
-        if (mem) *mem = jalloc<jreal>(static_cast<jreal>(atof(content)));
-        out = JustType::JustReal;
-    } else if (just_is_jnumber(*content)) {
-        if (mem) *mem = jalloc<jnumber>(atoll(content));
-        out = JustType::JustNumber;
-    } else if (just_is_jbool(content, &offset)) {
-        if (mem) *mem = jalloc<jbool>(offset == sizeof(just_syntax.just_true_string) - 1);
-        out = JustType::JustBoolean;
     } else  // another type
-        out = JustType::Unknown;
+        containType = JustType::Unknown;
 
     return offset;
 }
@@ -381,8 +376,7 @@ method int just_skip(const char* c, int len = std::numeric_limits<int>::max()) {
     char skipping[sizeof(just_syntax.just_trim_segments) + sizeof(just_syntax.just_array_segments)];
     *skipping ^= *skipping;
     strncpy(skipping, just_syntax.just_trim_segments, sizeof(just_syntax.just_trim_segments));
-    strncpy(skipping + sizeof just_syntax.just_trim_segments, just_syntax.just_array_segments,
-            sizeof(just_syntax.just_array_segments));
+    strncpy(skipping + sizeof just_syntax.just_trim_segments, just_syntax.just_array_segments, sizeof(just_syntax.just_array_segments));
     for (x ^= x; c[x] && x <= len;) {
         for (y ^= y; y < sizeof(skipping);)
             if (c[x] == skipping[y])
@@ -400,16 +394,13 @@ method int just_skip(const char* c, int len = std::numeric_limits<int>::max()) {
 method inline jbool just_valid_property_name(const char* abstractContent, int len) {
     int x;
     for (x ^= x; x < len; ++x, ++abstractContent)
-        if (!((*abstractContent >= *just_syntax.just_valid_property_name &&
-               *abstractContent <= just_syntax.just_valid_property_name[1]) ||
-              (x && just_is_unsigned_jnumber(*abstractContent)) || *abstractContent == just_syntax.just_valid_property_name[2]))
+        if (!((*abstractContent >= *just_syntax.just_valid_property_name && *abstractContent <= just_syntax.just_valid_property_name[1]) || (x && just_is_unsigned_jnumber(*abstractContent)) ||
+              *abstractContent == just_syntax.just_valid_property_name[2]))
             return false;
     return len != 0;
 }
 
-method inline jbool just_is_comment_line(const char* c, int len) {
-    return len > 0 && !strncmp(c, just_syntax.just_commentLine, std::min(2, len));
-}
+method inline jbool just_is_comment_line(const char* c, int len) { return len > 0 && !strncmp(c, just_syntax.just_commentLine, std::min(2, len)); }
 
 method inline int just_has_eol(const char* c, int len = std::numeric_limits<int>::max()) {
     int x;
@@ -678,8 +669,7 @@ method int just_avail(jstruct& entry, just_evaluated& eval, const char* source, 
                                         break;
                                 }
 
-                            } else if (current_block_type != valueType && current_block_type == JustType::JustReal &&
-                                       valueType != JustType::JustNumber) {
+                            } else if (current_block_type != valueType && current_block_type == JustType::JustReal && valueType != JustType::JustNumber) {
                                 throw std::runtime_error("Multi type is found.");
                             }
 
