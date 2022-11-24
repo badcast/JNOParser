@@ -1,9 +1,13 @@
 #include <cstdlib>
 #include <limits>
 #include <tuple>
-#include <sys/user.h>
-
 #include "justparser"
+
+#if __unix__
+#include <unistd.h>
+#else WIN32
+#include <windows.h>
+#endif
 
 #define method
 
@@ -169,23 +173,39 @@ inline void jfree(T* pointer) {
 
 inline void jfree(void* pointer) { std::free(pointer); }
 
-method inline just_storage* storage_init() {
-    constexpr auto _storageMinimum_SIZE = sizeof(just_storage) > PAGE_SIZE ? sizeof(just_storage) : PAGE_SIZE;
-    return static_cast<just_storage*>(std::memset(std::malloc(_storageMinimum_SIZE), 0, _storageMinimum_SIZE));
+method inline just_storage* storage_new_init() {
+    jnumber _PAGE_SIZE;
+#if __unix__
+    _PAGE_SIZE = sysconf(_SC_PAGE_SIZE);
+#elif WIN32
+    SYSTEM_INFO sysInfo;
+    GetSystemInfo(&sysInfo);
+    _PAGE_SIZE = sysInfo.dwPageSize;
+#endif
+    auto _storageMinimum_SIZE = sizeof(just_storage) > _PAGE_SIZE ? sizeof(just_storage) : _PAGE_SIZE;
+    void* ptr = std::malloc(_storageMinimum_SIZE);
+    if (!ptr) throw std::bad_alloc();
+    return static_cast<just_storage*>(std::memset(ptr, 0, _storageMinimum_SIZE));
 }
 
-method std::tuple<int, int> storage_calc_size(just_storage* pstorage) {
-    int calcSize, spaceSize;
-    jnumber* alpha = static_cast<jnumber*>(static_cast<void*>(pstorage) + sizeof(pstorage->just_allocated));
-    jnumber* delta = reinterpret_cast<jnumber*>(pstorage + 1);
-    for (; alpha < delta; ++alpha) {
-        // set next pointer
-        delta += static_cast<std::uint32_t>(*alpha >> 32);  // high (bytes)
+method std::uint32_t storage_calc_size(const just_storage* pstorage, JustType type) {
+    std::uint32_t calcSize;
+    const jnumber* alpha;
+
+    if (!pstorage) throw std::runtime_error("Memory is undefined");
+
+    if (type > JustType::Null) {
+        alpha = reinterpret_cast<const jnumber*>(static_cast<const void*>(pstorage) + sizeof(pstorage->just_allocated)) +
+                static_cast<int>(type);
+        calcSize = (*alpha) >> 32;
+    } else {
+        calcSize ^= calcSize;
     }
-    return std::make_tuple(calcSize, spaceSize);
+
+    return calcSize;
 }
 
-method jvariant storage_alloc_get(just_storage** pstore, JustType type, int allocSize = ~0) {
+method jvariant storage_alloc_get(just_storage** pstore, JustType type, int allocSize = Null) {
 #define store (*pstore)
     if (pstore == nullptr || *pstore == nullptr) throw std::bad_alloc();
 
@@ -193,11 +213,14 @@ method jvariant storage_alloc_get(just_storage** pstore, JustType type, int allo
         throw std::runtime_error("storage state an optimized");
     }
 
-    auto calc = storage_calc_size(*pstore);
+    // Storage Meta-info
+    // Low bytes: count
+    // High bytes: size
+    auto calc = storage_calc_size(store, type);
 
     void* _vault = store + 1;
-
-    if (allocSize < 0) allocSize = just_get_size(type);
+    int vaultSize;
+    if (allocSize <= 0) allocSize = just_get_size(type);
 
     switch (type) {
         case JustType::JustBoolean:
@@ -793,7 +816,7 @@ method void just_object_parser::deserialize(const char* source, int len) {
     }
 
     // init storage
-    _storage = storage_init();
+    _storage = storage_new_init();
     just_avail_only(eval, source, len, 0);
 }
 method jstring just_object_parser::serialize(JustSerializeFormat format) const {
