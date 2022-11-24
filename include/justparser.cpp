@@ -1,6 +1,7 @@
 #include <cstdlib>
 #include <tuple>
 #include "justparser"
+#include <climits>
 
 #if __unix__
 #include <unistd.h>
@@ -26,7 +27,7 @@ static const struct {
     char just_false_string[6] = MACROPUT(false);
     char just_null_string[5] = MACROPUT(null);
     char just_unknown_string[6]{MACROPUT({...})};
-    char just_array_segments[2]{'{', '}'};
+    char just_block_segments[2]{'{', '}'};
     char just_trim_segments[5]{32, '\t', '\n', '\r', '\v'};
     char just_valid_property_name[3] = {'A', 'z', '_'};
 } just_syntax;
@@ -372,10 +373,10 @@ method int just_trim(const char* content, int contentLength = INT_MAX) {
 
 method int just_skip(const char* c, int len = INT_MAX) {
     int x, y;
-    char skipping[sizeof(just_syntax.just_trim_segments) + sizeof(just_syntax.just_array_segments)];
+    char skipping[sizeof(just_syntax.just_trim_segments) + sizeof(just_syntax.just_block_segments)];
     *skipping ^= *skipping;
     strncpy(skipping, just_syntax.just_trim_segments, sizeof(just_syntax.just_trim_segments));
-    strncpy(skipping + sizeof just_syntax.just_trim_segments, just_syntax.just_array_segments, sizeof(just_syntax.just_array_segments));
+    strncpy(skipping + sizeof just_syntax.just_trim_segments, just_syntax.just_block_segments, sizeof(just_syntax.just_block_segments));
     for (x ^= x; c[x] && x <= len;) {
         for (y ^= y; y < sizeof(skipping);)
             if (c[x] == skipping[y])
@@ -436,7 +437,7 @@ method jbool just_is_array(const char* content, int& endpoint, int contentLength
     int x;
     jbool result = false;
 
-    if (*content == *just_syntax.just_array_segments) {
+    if (*content == *just_syntax.just_block_segments) {
         x ^= x;
         ++x;
         x += just_trim(content + x);
@@ -444,11 +445,11 @@ method jbool just_is_array(const char* content, int& endpoint, int contentLength
         x += just_autoskip_comment(content + x, contentLength - x);
         x += just_trim(content + x);
 
-        if (just_has_datatype(content + x) || content[x] == just_syntax.just_array_segments[1]) {
+        if (just_has_datatype(content + x) || content[x] == just_syntax.just_block_segments[1]) {
             for (; content[x] && x < contentLength; ++x) {
-                if (content[x] == just_syntax.just_array_segments[0])
+                if (content[x] == just_syntax.just_block_segments[0])
                     break;
-                else if (content[x] == just_syntax.just_array_segments[1]) {
+                else if (content[x] == just_syntax.just_block_segments[1]) {
                     endpoint = x;
                     result = true;
                     break;
@@ -486,7 +487,7 @@ method int just_avail_only(just_evaluated& eval, const char* source, int length,
     for (x ^= x; x < length;) {
         // has comment line
         y = x += just_autoskip_comment(pointer + x, length - x);
-        if (depth > 0 && pointer[x] == just_syntax.just_array_segments[1]) break;
+        if (depth > 0 && pointer[x] == just_syntax.just_block_segments[1]) break;
         x += just_skip(pointer + x, length - x);
 
         // check property name
@@ -499,7 +500,7 @@ method int just_avail_only(just_evaluated& eval, const char* source, int length,
         x += just_autoskip_comment(pointer + x, length - x);
         x += just_trim(pointer + x, length - x);  // trim string
         // is block or array
-        if (pointer[x] == *just_syntax.just_array_segments) {
+        if (pointer[x] == *just_syntax.just_block_segments) {
             if (just_is_array(pointer + x, y, length - x)) {
                 y += x++;
                 current_block_type = JustType::Unknown;
@@ -565,7 +566,7 @@ method int just_avail_only(just_evaluated& eval, const char* source, int length,
                 x += just_autoskip_comment(pointer + x, length - x);
             }
 
-            if (pointer[x] != just_syntax.just_array_segments[1]) {
+            if (pointer[x] != just_syntax.just_block_segments[1]) {
                 throw std::bad_exception();
             }
             ++x;
@@ -617,13 +618,9 @@ method int just_avail_only(just_evaluated& eval, const char* source, int length,
 // divide and conquer method avail
 method int just_avail(just_storage** storage, just_evaluated& eval, const char* source, int length, int depth) {
     int x, y;
+    const char* pointer;
     JustType valueType;
     JustType current_block_type;
-    const char* pointer;
-    struct property_node {
-        jstring propertyName;
-        void* data;
-    };
 
     // base step
     if (!length) return 0;
@@ -633,7 +630,7 @@ method int just_avail(just_storage** storage, just_evaluated& eval, const char* 
     for (x ^= x; x < length;) {
         // has comment line
         y = x += just_autoskip_comment(pointer + x, length - x);
-        if (depth > 0 && pointer[x] == just_syntax.just_array_segments[1]) break;
+        if (depth > 0 && pointer[x] == just_syntax.just_block_segments[1]) break;
         x += just_skip(pointer + x, length - x);
         // check property name
         if (!just_valid_property_name(pointer + y, x - y)) throw std::bad_exception();
@@ -643,12 +640,14 @@ method int just_avail(just_storage** storage, just_evaluated& eval, const char* 
         x += just_autoskip_comment(pointer + x, length - x);
         x += just_trim(pointer + x, length - x);  // trim string
         // is block or array
-        if (pointer[x] == *just_syntax.just_array_segments) {
+        if (pointer[x] == *just_syntax.just_block_segments) {
             if (just_is_array(pointer + x, y, length - x)) {
                 y += x++;
                 current_block_type = JustType::Unknown;
                 // prototype_node.flags = Node_ArrayFlag;
-                for (; x < y;) {
+
+                // While end of array length
+                while (x < y) {
                     x += just_autoskip_comment(pointer + x, y - x);
                     // next index
                     if (pointer[x] == just_syntax.just_obstacle)
@@ -660,17 +659,17 @@ method int just_avail(just_storage** storage, just_evaluated& eval, const char* 
                                 current_block_type = valueType;
 
                                 switch (current_block_type) {
-                                    case JustType::JustString:
-                                        prototype_node.set_native_memory((void*)jalloc<std::vector<jstring>>());
-                                        break;
                                     case JustType::JustBoolean:
                                         prototype_node.set_native_memory((void*)jalloc<std::vector<jbool>>());
+                                        break;
+                                    case JustType::JustNumber:
+                                        prototype_node.set_native_memory((void*)jalloc<std::vector<jnumber>>());
                                         break;
                                     case JustType::JustReal:
                                         prototype_node.set_native_memory((void*)jalloc<std::vector<jreal>>());
                                         break;
-                                    case JustType::JustNumber:
-                                        prototype_node.set_native_memory((void*)jalloc<std::vector<jnumber>>());
+                                    case JustType::JustString:
+                                        prototype_node.set_native_memory((void*)jalloc<std::vector<jstring>>());
                                         break;
                                 }
 
@@ -744,7 +743,7 @@ method int just_avail(just_storage** storage, just_evaluated& eval, const char* 
                 prototype_node.set_native_memory(_nodes);
                 x += just_autoskip_comment(pointer + x, length - x);
             }
-            if (pointer[x] != just_syntax.just_array_segments[1]) {
+            if (pointer[x] != just_syntax.just_block_segments[1]) {
                 throw std::bad_exception();
             }
             ++x;
