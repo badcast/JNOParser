@@ -196,6 +196,7 @@ method jvariant storage_alloc_get(just_storage** pstore, JustType type, int allo
     // Storage Meta-info
     // Low bytes: count
     // High bytes: size
+    // Check
     auto calc = storage_calc_size(store, type);
 
     void* _vault = store + 1;
