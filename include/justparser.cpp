@@ -3,9 +3,9 @@
 #include "justparser"
 #include <climits>
 
-#if __unix__
+#if __unix__ || __linux__
 #include <unistd.h>
-#else WIN32
+#elif WIN32
 #include <windows.h>
 #endif
 
