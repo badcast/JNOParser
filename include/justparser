@@ -33,7 +33,7 @@ using jstruct = std::map<int, just_object_node>;
 enum JustSerializeFormat {
     // Just (Just Node Object) a beautify string view
     JustBeautify,
-    // Just (Just Node Object) a compact strting data for effective communication
+    // Just (Just Node Object) a compact string data for effective communication
     JustCompact
 };
 

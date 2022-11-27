@@ -17,6 +17,4 @@ int main(int argn, char** argv) {
 
     /* cout << parser.at("node_name/node_2/n2_word")->toString()
           << parser.at("node_name/node_2/node_3/n3_word")->toString() << endl;*/
-
-    return 0;
 }

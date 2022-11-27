@@ -110,7 +110,7 @@ struct just_storage {
     // up members  : meta-info
     // down members: size-info
     std::uint8_t just_allocated;
-    jnumber numBools, numNumbers, numReals, numStrings, numProperties, arrayBools, arrayNumbers, arrayReals, arrayStrings;
+    jnumber numBools, numNumbers, numReals, numStrings, arrayBools, arrayNumbers, arrayReals, arrayStrings, numProperties;
 };
 
 struct just_evaluated {
@@ -187,6 +187,8 @@ method std::uint32_t storage_calc_size(const just_storage* pstorage, JustType ty
 
 method jvariant storage_alloc_get(just_storage** pstore, JustType type, int allocSize = Null) {
 #define store (*pstore)
+#define _addNumber(plot) ()
+
     if (pstore == nullptr || *pstore == nullptr) throw std::bad_alloc();
 
     if ((*pstore)->just_allocated) {
@@ -200,9 +202,14 @@ method jvariant storage_alloc_get(just_storage** pstore, JustType type, int allo
     auto calc = storage_calc_size(store, type);
 
     void* _vault = store + 1;
+    void* newAllocated;
     int vaultSize;
     if (allocSize <= 0) allocSize = just_type_size(type);
 
+    newAllocated = std::realloc(_vault, allocSize);
+
+    if (!newAllocated) return newAllocated;  // bad alloc
+    _vault = newAllocated;
     switch (type) {
         case JustType::JustBoolean:
 
@@ -403,11 +410,11 @@ method inline jbool just_valid_property_name(const char* abstractContent, int le
 
 method inline jbool just_is_comment_line(const char* c, int len) { return len > 0 && !std::strncmp(c, just_syntax.just_commentLine, std::min(2, len)); }
 
-method inline int just_has_eol(const char* c, int len = INT_MAX) {
-    int x;
-    for (x ^= x; *c && x < len && *c != just_syntax.just_eol_segment; ++x, ++c)
-        ;
-    return x;
+method inline int just_has_eol(const char* pointer, int len = INT_MAX) {
+    const char* chars = pointer;
+    const char* endChars = pointer + len;
+    while (*chars && chars < endChars && *chars != just_syntax.just_eol_segment) ++chars;
+    return static_cast<int>(chars - pointer);
 }
 
 // method for skip comment's
@@ -439,8 +446,7 @@ method jbool just_is_array(const char* content, int& endpoint, int contentLength
     jbool result = false;
 
     if (*content == *just_syntax.just_block_segments) {
-        x ^= x;
-        ++x;
+        x = x == x;
         x += just_trim(content + x);
 
         x += just_autoskip_comment(content + x, contentLength - x);
