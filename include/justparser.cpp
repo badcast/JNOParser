@@ -1,7 +1,9 @@
-#include <cstdlib>
+﻿#include <cstdlib>
+#include <vector>
 #include <tuple>
-#include "justparser"
 #include <climits>
+
+#include "justparser"
 
 #if __unix__ || __linux__
 #include <unistd.h>
@@ -14,6 +16,8 @@
 #define MACROPUT(base) #base
 
 namespace just {
+
+typedef std::vector<int> jtree_t;
 
 static const struct {
     char just_dot = '.';
@@ -235,7 +239,7 @@ method jvariant storage_alloc_get(just_storage** pstore, JustType type, int allo
 #undef store
 }
 
-method std::vector<int>* storage_alloc_struct(just_storage** pstore) {
+method std::vector<int>* storage_alloc_tree(just_storage** pstore) {
     if (pstore == nullptr || *pstore == nullptr) throw std::bad_alloc();
 
     if ((*pstore)->just_allocated) {
@@ -642,6 +646,7 @@ method int just_avail_only(just_evaluated& eval, const char* source, int length,
     return x;
 }
 
+
 // big algorithm, please free me.
 // divide and conquer method avail
 method int just_avail(just_storage** storage, just_evaluated& eval, const char* source, int length, int depth) {
@@ -650,20 +655,26 @@ method int just_avail(just_storage** storage, just_evaluated& eval, const char* 
     JustType valueType;
     JustType current_block_type;
 
-    // base step
-    if (!length) return 0;
+    std::vector<jtree_t*> _stacks;
+
+    _stacks.emplace_back(storage_alloc_tree(storage));
+
+#define prototype_node (_stacks.back()) // set a macro name
 
     pointer = source;
 
     for (x ^= x; x < length;) {
-        // has comment line
+        // skip and trimming
         y = x += just_autoskip_comment(pointer + x, length - x);
         if (depth > 0 && pointer[x] == just_syntax.just_block_segments[1]) break;
         x += just_skip(pointer + x, length - x);
-        // check property name
+
+        // Preparing, check property name
         if (!just_valid_property_name(pointer + y, x - y)) throw std::bad_exception();
+
         prototype_node = {};
         prototype_node.propertyName.append(pointer + y, static_cast<size_t>(x - y));  // set property name
+
         // has comment line
         x += just_autoskip_comment(pointer + x, length - x);
         x += just_trim(pointer + x, length - x);  // trim string
@@ -765,7 +776,8 @@ method int just_avail(just_storage** storage, just_evaluated& eval, const char* 
 
                 prototype_node.flags |= (current_block_type) << 2;
             } else {  // get the next node
-                std::vector<int>* struct = storage_alloc_struct(storage);
+                auto _tree = storage_alloc_tree(storage);
+
                 ++x;
                 x += just_avail(storage, eval, pointer + x, length - x, depth + 1);
                 // prototype_node.flags = Node_StructFlag;
@@ -779,6 +791,7 @@ method int just_avail(just_storage** storage, just_evaluated& eval, const char* 
         } else {  // get also value
             x += just_get_format(pointer + x, storage, valueType);
             prototype_node.set_native_memory(memory);
+
             memory = nullptr;
             // prototype_node.flags = Node_ValueFlag | valueType << 2;
         }
@@ -788,6 +801,7 @@ method int just_avail(just_storage** storage, just_evaluated& eval, const char* 
         x += just_autoskip_comment(pointer + x, length - x);
     }
 
+#undef prototype_node // undefine a macro name
     return x;
 }
 

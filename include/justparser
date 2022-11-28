@@ -9,7 +9,6 @@
 #include <cstdint>
 #include <map>
 #include <cstring>
-#include <vector>
 #include <fstream>
 #include <stdexcept>
 
