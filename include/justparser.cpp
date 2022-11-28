@@ -132,6 +132,7 @@ struct just_evaluated {
     jnumber calcBytes() {
         jnumber sz;
 
+        // set "sz" to zero
         sz ^= sz;
 
         // calc jstring
@@ -153,8 +154,8 @@ struct just_evaluated {
     }
 };
 
-method inline just_storage* storage_new_init() {
-    jnumber _PAGE_SIZE;
+method inline int get_page_size() {
+    int _PAGE_SIZE;
 #if __unix__
     _PAGE_SIZE = sysconf(_SC_PAGE_SIZE);
 #elif WIN32
@@ -162,10 +163,16 @@ method inline just_storage* storage_new_init() {
     GetSystemInfo(&sysInfo);
     _PAGE_SIZE = sysInfo.dwPageSize;
 #endif
-    auto _storageMinimum_SIZE = sizeof(just_storage) > _PAGE_SIZE ? sizeof(just_storage) : _PAGE_SIZE;
-    void* ptr = std::malloc(_storageMinimum_SIZE);
+    return _PAGE_SIZE;
+}
+
+// method for create and init new storage.
+method inline just_storage* storage_new_init() {
+    auto pgSize = get_page_size();
+    pgSize = sizeof(just_storage) > pgSize ? sizeof(just_storage) : pgSize;
+    void* ptr = std::malloc(pgSize);
     if (!ptr) throw std::bad_alloc();
-    return static_cast<just_storage*>(std::memset(ptr, 0, _storageMinimum_SIZE));
+    return static_cast<just_storage*>(std::memset(ptr, 0, pgSize));
 }
 
 method std::uint32_t storage_calc_size(const just_storage* pstorage, JustType type) {
@@ -226,6 +233,15 @@ method jvariant storage_alloc_get(just_storage** pstore, JustType type, int allo
             throw std::bad_cast();
     }
 #undef store
+}
+
+method std::vector<int>* storage_alloc_struct(just_storage** pstore) {
+    if (pstore == nullptr || *pstore == nullptr) throw std::bad_alloc();
+
+    if ((*pstore)->just_allocated) {
+        throw std::runtime_error("storage state an optimized");
+    }
+    return nullptr;
 }
 
 method bool storage_optimize(just_storage** pstorage) {
@@ -294,9 +310,10 @@ method inline jbool just_is_jbool(const char* content, int* getLength) {
 }
 
 // method for get format from raw content, also to write in storage pointer
-method int just_get_format(const char* content, just_storage** storage, JustType& containType) {
+method int just_get_format(const char* content, just_storage** storage, JustType& containType, jvariant* outValue = nullptr) {
     int x;
     int offset;
+    void* mem;
 
     offset ^= offset;  // set to zero
 
@@ -308,7 +325,8 @@ method int just_get_format(const char* content, just_storage** storage, JustType
         if (storage) {
             jbool conv = (offset == sizeof(just_syntax.just_true_string) - 1);
             // Copy to
-            std::memcpy(storage_alloc_get(storage, containType), &conv, just_type_size(containType));
+            mem = std::memcpy(storage_alloc_get(storage, containType), &conv, just_type_size(containType));
+            if (outValue) *outValue = mem;
         }
 
     } else if (just_is_jnumber(*content)) {  // Number type ---------------------------------------------------------------------------------
@@ -316,14 +334,16 @@ method int just_get_format(const char* content, just_storage** storage, JustType
         if (storage) {
             jnumber conv = std::atoll(content);
             // Copy to
-            std::memcpy(storage_alloc_get(storage, containType), &conv, just_type_size(containType));
+            mem = std::memcpy(storage_alloc_get(storage, containType), &conv, just_type_size(containType));
+            if (outValue) *outValue = mem;
         }
     } else if (just_is_jreal(content, &offset)) {  // Real type -----------------------------------------------------------------------------
         containType = JustType::JustReal;
         if (storage) {
             jreal conv = std::atof(content);
             // Copy to
-            std::memcpy(storage_alloc_get(storage, containType), &conv, just_type_size(containType));
+            mem = std::memcpy(storage_alloc_get(storage, containType), &conv, just_type_size(containType));
+            if (outValue) *outValue = mem;
         }
     } else if (*content == just_syntax.just_format_string) {  // String type ----------------------------------------------------------------
 
@@ -342,7 +362,8 @@ method int just_get_format(const char* content, just_storage** storage, JustType
                 }
 
                 // Copy to
-                std::memcpy(storage_alloc_get(storage, containType, stringSyntax.size()), stringSyntax.data(), stringSyntax.size());
+                mem = std::memcpy(storage_alloc_get(storage, containType, stringSyntax.size()), stringSyntax.data(), stringSyntax.size());
+                if (outValue) *outValue = mem;
             }
         }
         offset += 2;
@@ -660,23 +681,24 @@ method int just_avail(just_storage** storage, just_evaluated& eval, const char* 
                     if (pointer[x] == just_syntax.just_obstacle)
                         ++x;
                     else {
-                        x += just_get_format(pointer + x, storage, valueType);
+                        jvariant pvalue;
+                        x += just_get_format(pointer + x, storage, valueType, &pvalue);
                         if (valueType != JustType::Unknown) {
                             if (current_block_type == JustType::Unknown) {
                                 current_block_type = valueType;
 
                                 switch (current_block_type) {
                                     case JustType::JustBoolean:
-                                        prototype_node.set_native_memory((void*)jalloc<std::vector<jbool>>());
+                                        // prototype_node.set_native_memory((void*)jalloc<std::vector<jbool>>());
                                         break;
                                     case JustType::JustNumber:
-                                        prototype_node.set_native_memory((void*)jalloc<std::vector<jnumber>>());
+                                        // prototype_node.set_native_memory((void*)jalloc<std::vector<jnumber>>());
                                         break;
                                     case JustType::JustReal:
-                                        prototype_node.set_native_memory((void*)jalloc<std::vector<jreal>>());
+                                        // prototype_node.set_native_memory((void*)jalloc<std::vector<jreal>>());
                                         break;
                                     case JustType::JustString:
-                                        prototype_node.set_native_memory((void*)jalloc<std::vector<jstring>>());
+                                        // prototype_node.set_native_memory((void*)jalloc<std::vector<jstring>>());
                                         break;
                                 }
 
@@ -686,33 +708,33 @@ method int just_avail(just_storage** storage, just_evaluated& eval, const char* 
 
                             switch (current_block_type) {
                                 case JustType::JustString: {
-                                    auto ref = (jstring*)memory;
+                                    /*auto ref = (jstring*)memory;
                                     ((std::vector<jstring>*)prototype_node.handle)->emplace_back(*ref);
-                                    jfree(ref);
+                                    jfree(ref);*/
                                     break;
                                 }
                                 case JustType::JustBoolean: {
-                                    auto ref = (jbool*)memory;
-                                    ((std::vector<jbool>*)prototype_node.handle)->emplace_back(*ref);
-                                    jfree(ref);
+                                    //                                    auto ref = (jbool*)memory;
+                                    //                                    ((std::vector<jbool>*)prototype_node.handle)->emplace_back(*ref);
+                                    //                                    jfree(ref);
                                     break;
                                 }
                                 case JustType::JustReal: {
-                                    jreal* ref;
-                                    if (valueType == JustType::JustNumber) {
-                                        ref = new jreal(static_cast<jreal>(*(jnumber*)memory));
-                                        jfree((jnumber*)pointer);
-                                    } else
-                                        ref = (jreal*)memory;
+                                    //                                    jreal* ref;
+                                    //                                    if (valueType == JustType::JustNumber) {
+                                    //                                        ref = new jreal(static_cast<jreal>(*(jnumber*)memory));
+                                    //                                        jfree((jnumber*)pointer);
+                                    //                                    } else
+                                    //                                        ref = (jreal*)memory;
 
-                                    ((std::vector<jreal>*)prototype_node.handle)->emplace_back(*ref);
-                                    jfree(ref);
+                                    //                                    ((std::vector<jreal>*)prototype_node.handle)->emplace_back(*ref);
+                                    //                                    jfree(ref);
                                     break;
                                 }
                                 case JustType::JustNumber: {
-                                    auto ref = (jnumber*)memory;
-                                    ((std::vector<jnumber>*)prototype_node.handle)->emplace_back(*ref);
-                                    jfree(ref);
+                                    //                                    auto ref = (jnumber*)memory;
+                                    //                                    ((std::vector<jnumber>*)prototype_node.handle)->emplace_back(*ref);
+                                    //                                    jfree(ref);
                                     break;
                                 }
                             }
@@ -743,7 +765,7 @@ method int just_avail(just_storage** storage, just_evaluated& eval, const char* 
 
                 prototype_node.flags |= (current_block_type) << 2;
             } else {  // get the next node
-                jstruct* _nodes = jalloc<jstruct>();
+                std::vector<int>* struct = storage_alloc_struct(storage);
                 ++x;
                 x += just_avail(storage, eval, pointer + x, length - x, depth + 1);
                 // prototype_node.flags = Node_StructFlag;
