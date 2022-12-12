@@ -3,6 +3,7 @@
 #include <tuple>
 #include <climits>
 
+// import header
 #include "justparser"
 
 #if __unix__ || __linux__
@@ -239,13 +240,19 @@ method jvariant storage_alloc_get(just_storage** pstore, JustType type, int allo
 #undef store
 }
 
-method std::vector<int>* storage_alloc_tree(just_storage** pstore) {
+method jtree_t* storage_alloc_tree(just_storage** pstore) {
     if (pstore == nullptr || *pstore == nullptr) throw std::bad_alloc();
 
     if ((*pstore)->just_allocated) {
         throw std::runtime_error("storage state an optimized");
     }
     return nullptr;
+}
+
+method jvariant storage_alloc_array(just_storage** pstore, JustType arrayType) {
+    jvariant variant;
+
+    return variant;
 }
 
 method bool storage_optimize(just_storage** pstorage) {
@@ -277,8 +284,7 @@ method JustType just_get_type(const void* pointer, just_storage* pstorage) {
 // method for fast get hash from string
 method inline int just_string_to_hash_fast(const char* content, int contentLength = INT32_MAX) {
     int x, y;
-    x = x == x;  // set to one
-    y ^= y;      // set to zero
+    y = (x = x == x) ^ x;  // init a x, y variable
     while (*(content) && y++ < contentLength) x *= *content;
     return x;
 }
@@ -646,7 +652,6 @@ method int just_avail_only(just_evaluated& eval, const char* source, int length,
     return x;
 }
 
-
 // big algorithm, please free me.
 // divide and conquer method avail
 method int just_avail(just_storage** storage, just_evaluated& eval, const char* source, int length, int depth) {
@@ -657,9 +662,11 @@ method int just_avail(just_storage** storage, just_evaluated& eval, const char* 
 
     std::vector<jtree_t*> _stacks;
 
-    _stacks.emplace_back(storage_alloc_tree(storage));
+    _stacks.emplace_back(storage_alloc_tree(storage));  // push head tree
 
-#define prototype_node (_stacks.back()) // set a macro name
+#define prototype_node (_stacks.back())  // set a macro name
+#define push(object) (_stacks.push_back(object))
+#define pop() (_stacks.pop_back())
 
     pointer = source;
 
@@ -672,7 +679,6 @@ method int just_avail(just_storage** storage, just_evaluated& eval, const char* 
         // Preparing, check property name
         if (!just_valid_property_name(pointer + y, x - y)) throw std::bad_exception();
 
-        prototype_node = {};
         prototype_node.propertyName.append(pointer + y, static_cast<size_t>(x - y));  // set property name
 
         // has comment line
@@ -801,7 +807,10 @@ method int just_avail(just_storage** storage, just_evaluated& eval, const char* 
         x += just_autoskip_comment(pointer + x, length - x);
     }
 
-#undef prototype_node // undefine a macro name
+#undef prototype_node  // undefine a macro name
+#undef push
+#undef pop
+
     return x;
 }
 
@@ -859,6 +868,8 @@ method jstring just_object_parser::serialize(JustSerializeFormat format) const {
     jstruct* entry;
 
     // Write structure block
+
+    // TODO: Go here write (serialize)
 
     return data;
 }
