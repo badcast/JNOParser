@@ -11,7 +11,7 @@ enable_testing()
 include_directories(include)
 
 #find sources for compiling
-file(GLOB TARGET_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/include/justparser" "${CMAKE_CURRENT_SOURCE_DIR}/include/*.cpp")
+file(GLOB TARGET_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/include/justparser" "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
 add_library(libjust STATIC ${TARGET_SOURCES})
 
 #target include <...>
