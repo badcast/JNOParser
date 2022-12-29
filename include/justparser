@@ -13,122 +13,127 @@
 #include <stdexcept>
 
 namespace just {
-class just_object_parser;
-class just_object_node;
+    class just_object_parser;
+    class just_object_node;
 
-/// undefined type
-typedef void* jvariant;
-/// string type
-typedef std::string jstring;
-/// integer type
-typedef std::int64_t jnumber;
-/// real type
-typedef double jreal;
-/// logical type
-typedef bool jbool;
+    /// undefined type
+    typedef void* jvariant;
+    /// string type
+    typedef std::string jstring;
+    /// integer type
+    typedef std::int64_t jnumber;
+    /// real type
+    typedef double jreal;
+    /// logical type
+    typedef bool jbool;
 
-using jstruct = std::map<int, just_object_node>;
+    using jstruct = std::map<int, just_object_node>;
 
-enum JustSerializeFormat {
-    // Just (Just Node Object) a beautify string view
-    JustBeautify,
-    // Just (Just Node Object) a compact string data for effective communication
-    JustCompact
-};
+    enum JustSerializeFormat {
+        // Just (Just Node Object) a beautify string view
+        JustBeautify,
+        // Just (Just Node Object) a compact string data for effective communication
+        JustCompact
+    };
 
-enum JustAllocationMethod {
-    // dynamic type: dynamic deserialization fast and plump loading
-    dynamic_allocation,
-    // fixed type: memory saving, reloading by the "evaluation-conclusion"
-    fixed_allocation
-};
+    enum JustAllocationMethod {
+        // dynamic type: dynamic deserialization fast and plump loading
+        dynamic_allocation,
+        // fixed type: memory saving, reloading by the "evaluation-conclusion"
+        fixed_allocation
+    };
 
-/* standart Just types */
-enum JustType : std::int8_t {  Unknown = -1, Null = 0, JustBoolean, JustNumber, JustReal, JustString };
+    /* standart Just types */
+    enum JustType : std::int8_t { Unknown = -1,
+        Null = 0,
+        JustBoolean,
+        JustNumber,
+        JustReal,
+        JustString };
 
-class just_object_node {
-    friend class just_object_parser;
+    class just_object_node {
+        friend class just_object_parser;
 
-   protected:
-    just_object_parser* owner;
-    jvariant var = nullptr;
+    protected:
+        just_object_parser* owner;
+        jvariant var = nullptr;
 
-    just_object_node(just_object_parser* head, void* handle);
+        just_object_node(just_object_parser* head, void* handle);
 
-   public:
-    // Property 'name' it is Node
-    const jstring name() const;
+    public:
+        // Property 'name' it is Node
+        const jstring name() const;
 
-    // Property 'type' for get type
-    JustType type() const;
+        // Property 'type' for get type
+        JustType type() const;
 
-    // Property 'tree' for get child
-    just_object_node* tree(const jstring& child);
+        // Property 'tree' for get child
+        just_object_node* tree(const jstring& child);
 
-    // Property 'has_tree' defined tree
-    jbool has_tree() const;
+        // Property 'has_tree' defined tree
+        jbool has_tree() const;
 
-    // Property 'has_value' is the value from this Node
-    jbool has_value() const;
+        // Property 'has_value' is the value from this Node
+        jbool has_value() const;
 
-    template <typename ValueTp>
-    const ValueTp& value() const;
+        template <typename ValueTp>
+        const ValueTp& value() const;
 
-    /* operators */
+        /* operators */
 
-    explicit operator jstring() const;
-    explicit operator jnumber() const;
-    explicit operator jreal() const;
-    explicit operator jbool() const;
-};
+        explicit operator jstring() const;
+        explicit operator jnumber() const;
+        explicit operator jreal() const;
+        explicit operator jbool() const;
+    };
 
-class just_object_parser {
-    friend class just_object_node;
+    class just_object_parser {
+        friend class just_object_node;
 
-   protected:
-    void* _storage;
-    jstruct entry;
+    protected:
+        void* _storage;
+        jstruct entry;
 
-   public:
-    just_object_parser(JustAllocationMethod allocationMethod = JustAllocationMethod::dynamic_allocation);
-    just_object_parser(const just_object_parser&) = delete;
-    virtual ~just_object_parser();
+    public:
+        just_object_parser(JustAllocationMethod allocationMethod = JustAllocationMethod::dynamic_allocation);
+        just_object_parser(const just_object_parser&) = delete;
+        virtual ~just_object_parser();
 
-    void deserialize_from(const char* filename);
-    void deserialize(const std::string& source);
-    void deserialize(const char* source, int len);
-    void deserialize(const std::string& content, int depth = -1);
+        void deserialize_from(const char* filename);
+        void deserialize(const std::string& source);
+        void deserialize(const char* source, int len);
+        void deserialize(const std::string& content, int depth = -1);
 
-    // Serialize as string format (text structured data)
-    jstring serialize(JustSerializeFormat format = JustSerializeFormat::JustCompact) const;
+        // Serialize as string format (text structured data)
+        jstring serialize(JustSerializeFormat format = JustSerializeFormat::JustCompact) const;
 
-    // Find node from childrens
-    // example, "First/Second/Triple" -> Node
-    // for has a node, contains method use.
-    just_object_node* at(const std::string& name);
+        // Find node from childrens
+        // example, "First/Second/Triple" -> Node
+        // for has a node, contains method use.
+        just_object_node* at(const std::string& name);
 
-    // Find node
-    just_object_node* find_node(const std::string& nodePath);
+        // Find node
+        just_object_node* find_node(const std::string& nodePath);
 
-    // search node by name or prefix value, example
-    just_object_node* search(const std::string& name);
+        // search node by name or prefix value, example
+        just_object_node* search(const std::string& name);
 
-    // result of occupied memory forevery nodes
-    jnumber occupied_memory();
+        // result of occupied memory forevery nodes
+        jnumber occupied_memory();
 
-    jnumber occupied_memory(JustType box);
+        jnumber occupied_memory(JustType box);
 
-    bool contains(const std::string& nodePath);
+        bool contains(const std::string& nodePath);
 
-    just_object_node* tree(const jstring& child);
-};
+        just_object_node* tree(const jstring& child);
+    };
 
-just_object_node& operator<<(just_object_node&, const jstring&);
+    just_object_node& operator<<(just_object_node&, const jstring&);
 
-just_object_node& operator<<(just_object_parser&, const jstring&);
+    just_object_node& operator<<(just_object_parser&, const jstring&);
 
-std::ostream& operator<<(std::ostream&, const just_object_node&);
+    std::ostream& operator<<(std::ostream&, const just_object_node&);
 
-std::ostream& operator<<(std::ostream&, const just_object_parser&);
+    std::ostream& operator<<(std::ostream&, const just_object_parser&);
 
-}  // namespace just
+} // namespace just

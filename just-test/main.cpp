@@ -11,9 +11,9 @@ std::string getExecPath(std::string app) {
 }
 
 int main(int argn, char** argv) {
-    just::just_object_parser parser;
+    //just::just_object_parser parser;
 
-    parser.deserialize_from((getExecPath(*argv) + "/syntax.just").c_str());
+    //parser.deserialize_from((getExecPath(*argv) + "/syntax.just").c_str());
 
     /* cout << parser.at("node_name/node_2/n2_word")->toString()
           << parser.at("node_name/node_2/node_3/n3_word")->toString() << endl;*/

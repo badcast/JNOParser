@@ -254,6 +254,7 @@ namespace just {
 #undef store
     }
 
+    // Create Main Tree
     method jtree_t* storage_alloc_tree(just_storage** pstore)
     {
         if (pstore == nullptr || *pstore == nullptr)
@@ -265,6 +266,7 @@ namespace just {
         return nullptr;
     }
 
+    // Create Array Node
     method jvariant storage_alloc_array(just_storage** pstore, JustType arrayType)
     {
         jvariant variant;
@@ -272,9 +274,9 @@ namespace just {
         return variant;
     }
 
+    // Optimize storage (ordering and compres)
     method bool storage_optimize(just_storage** pstorage)
     {
-        if(pstorage->
         if ((*pstorage)->just_allocated)
             return true;
 
@@ -732,7 +734,8 @@ namespace just {
             if (!just_valid_property_name(pointer + y, x - y))
                 throw std::bad_exception();
 
-            prototype_node.propertyName.append(pointer + y, static_cast<size_t>(x - y)); // set property name
+            // BUG: Set property name
+            // prototype_node.propertyName.append(pointer + y, static_cast<size_t>(x - y)); // set property name
 
             // has comment line
             x += just_autoskip_comment(pointer + x, length - x);
@@ -813,14 +816,18 @@ namespace just {
                         x += just_autoskip_comment(pointer + x, y - x);
                     }
 
-                    prototype_node.flags |= (current_block_type) << 2;
+                    // BUG: Set node flags
+                    // prototype_node.flags |= (current_block_type) << 2;
                 } else { // get the next node
                     auto _tree = storage_alloc_tree(storage);
 
                     ++x;
                     x += just_avail(storage, eval, pointer + x, length - x, depth + 1);
                     // prototype_node.flags = Node_StructFlag;
-                    prototype_node.set_native_memory(_nodes);
+
+                    // BUG: set node memory pointer (handle)
+                    //  prototype_node.set_native_memory(_nodes);
+
                     x += just_autoskip_comment(pointer + x, length - x);
                 }
                 if (pointer[x] != just_syntax.just_block_segments[1]) {
@@ -830,14 +837,16 @@ namespace just {
             } else { // get also value
                 x += just_get_format(pointer + x, storage, valueType);
 
-                //prototype set memory pointer
-                prototype_node.set_native_memory(memory);
+                // BUG: prototype set memory pointer
+                // prototype_node.set_native_memory(memory);
 
-                memory = nullptr;
-                // prototype_node.flags = Node_ValueFlag | valueType << 2;
+                // BUG: memory ?
+                // memory = nullptr;
+                //  prototype_node.flags = Node_ValueFlag | valueType << 2;
             }
 
-            entry.insert(std::make_pair(y = just_string_to_hash_fast(prototype_node.propertyName.c_str()), prototype_node));
+            // BUG: Insert node child
+            // entry.insert(std::make_pair(y = just_string_to_hash_fast(prototype_node.propertyName.c_str()), prototype_node));
 
             x += just_autoskip_comment(pointer + x, length - x);
         }
@@ -847,6 +856,10 @@ namespace just {
 #undef pop
 
         return x;
+    }
+
+    just_object_parser::just_object_parser(JustAllocationMethod allocationMethod)
+    {
     }
 
     method void just_object_parser::deserialize_from(const char* filename)
