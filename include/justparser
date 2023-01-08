@@ -4,28 +4,30 @@
 //  github: github.com/badcast/just-parser
 //  soundcloud: soundcloud.com/light-mister
 
-#pragma once
+#ifndef JUST_PARSER_H
+#define JUST_PARSER_H
 
 #include <cstdint>
 #include <map>
 #include <cstring>
 #include <fstream>
 #include <stdexcept>
+#include <type_traits>
 
 namespace just {
     class just_object_parser;
     class just_object_node;
 
     /// undefined type
-    typedef void* jvariant;
+    typedef void*           jvariant;
     /// string type
-    typedef std::string jstring;
+    typedef std::string     jstring;
     /// integer type
-    typedef std::int64_t jnumber;
+    typedef std::int64_t    jnumber;
     /// real type
-    typedef double jreal;
+    typedef double          jreal;
     /// logical type
-    typedef bool jbool;
+    typedef bool            jbool;
 
     using jstruct = std::map<int, just_object_node>;
 
@@ -37,19 +39,21 @@ namespace just {
     };
 
     enum JustAllocationMethod {
-        // dynamic type: dynamic deserialization fast and plump loading
+        // dynamic allocation: dynamic deserialization fast and plump loading
         dynamic_allocation,
-        // fixed type: memory saving, reloading by the "evaluation-conclusion"
+        // fixed allocation: memory saving, reloading by the "evaluation-conclusion"
         fixed_allocation
     };
 
     /* standart Just types */
-    enum JustType : std::int8_t { Unknown = -1,
+    enum JustType : std::int8_t {
+        Unknown = -1,
         Null = 0,
         JustBoolean,
         JustNumber,
         JustReal,
-        JustString };
+        JustString
+    };
 
     class just_object_node {
         friend class just_object_parser;
@@ -59,6 +63,11 @@ namespace just {
         jvariant var = nullptr;
 
         just_object_node(just_object_parser* head, void* handle);
+
+        const jnumber get_int() const;
+        const jbool get_bool() const;
+        const jstring get_str() const;
+        const jreal get_real() const;
 
     public:
         // Property 'name' it is Node
@@ -76,8 +85,27 @@ namespace just {
         // Property 'has_value' is the value from this Node
         jbool has_value() const;
 
-        template <typename ValueTp>
-        const ValueTp& value() const;
+//        const jnumber value() const
+//        {
+//            return static_cast<jnumber>(get_int());
+//        }
+
+//        const jbool value() const
+//        {
+//            return static_cast<jbool>(get_bool());
+//        }
+
+//        const jreal value() const
+//        {
+//            return static_cast<jreal>(get_real());
+//        }
+
+//        const jstring value() const
+//        {
+//            return static_cast<jstring>(get_str());
+//        }
+
+        jstring to_string() const;
 
         /* operators */
 
@@ -95,11 +123,12 @@ namespace just {
         jstruct entry;
 
     public:
-        just_object_parser(JustAllocationMethod allocationMethod = JustAllocationMethod::dynamic_allocation);
+        just_object_parser();
+        just_object_parser(JustAllocationMethod allocationMethod);
         just_object_parser(const just_object_parser&) = delete;
         virtual ~just_object_parser();
 
-        void deserialize_from(const char* filename);
+        void deserialize_from(const jstring& filename);
         void deserialize(const std::string& source);
         void deserialize(const char* source, int len);
         void deserialize(const std::string& content, int depth = -1);
@@ -137,3 +166,4 @@ namespace just {
     std::ostream& operator<<(std::ostream&, const just_object_parser&);
 
 } // namespace just
+#endif

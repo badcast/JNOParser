@@ -12,10 +12,10 @@ include_directories(include)
 
 #find sources for compiling
 file(GLOB TARGET_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/include/justparser" "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
-add_library(libjust STATIC ${TARGET_SOURCES})
+add_library(justio STATIC ${TARGET_SOURCES})
 
 #target include <...>
-target_include_directories(libjust INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(justio INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
 
 #set add test
 add_subdirectory(just-test/)

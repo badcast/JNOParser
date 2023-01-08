@@ -1,4 +1,12 @@
-﻿#include <cstdlib>
+﻿/*
+    *** Just Object Parser ***
+    *** Project by badcast <lmecomposer@gmail.com>
+    *** project url: https://github.com/badcast/just-parser
+    *** Project Date: 31.12.2022
+
+*/
+
+#include <cstdlib>
 #include <vector>
 #include <tuple>
 #include <climits>
@@ -121,7 +129,7 @@ namespace just {
         jnumber numBools, numNumbers, numReals, numStrings, arrayBools, arrayNumbers, arrayReals, arrayStrings, numProperties;
     };
 
-    struct just_evaluated {
+    struct just_stats {
         std::uint16_t jstrings;
         std::uint32_t jstrings_total_bytes;
         std::uint16_t jnumbers;
@@ -139,10 +147,7 @@ namespace just {
 
         const jnumber calcBytes() const
         {
-            jnumber sz;
-
-            // set "sz" to zero
-            sz ^= sz;
+            jnumber sz = 0;
 
             // calc jstring
             sz += jstrings_total_bytes;
@@ -181,14 +186,15 @@ namespace just {
     // method for create and init new storage.
     method inline just_storage* storage_new_init()
     {
-        auto pgSize = get_page_size();
+        int pgSize = get_page_size();
+        void* ptr;
         pgSize = sizeof(just_storage) > pgSize ? sizeof(just_storage) : pgSize;
-        void* ptr = std::malloc(pgSize);
-        if (!ptr)
+        if (!(ptr = std::malloc(pgSize)))
             throw std::bad_alloc();
         return static_cast<just_storage*>(std::memset(ptr, 0, pgSize));
     }
 
+    // Get storage size from type order
     method std::uint32_t storage_calc_size(const just_storage* pstorage, JustType type)
     {
         std::uint32_t calcSize;
@@ -202,13 +208,13 @@ namespace just {
             calcSize = (*alpha) >> 32;
         } else {
             // set to zero
-            calcSize ^= calcSize;
+            calcSize = 0;
         }
 
         return calcSize;
     }
 
-    method jvariant storage_alloc_get(just_storage** pstore, JustType type, int allocSize = Null)
+    method jvariant storage_alloc_node(just_storage** pstore, JustType type, int allocSize = Null)
     {
 #define store (*pstore)
 #define _addNumber(plot) ()
@@ -217,7 +223,7 @@ namespace just {
             throw std::bad_alloc();
 
         if ((*pstore)->just_allocated) {
-            throw std::runtime_error("storage state an optimized");
+            throw std::runtime_error("storage in optimized state");
         }
 
         // Storage Meta-info
@@ -261,7 +267,7 @@ namespace just {
             throw std::bad_alloc();
 
         if ((*pstore)->just_allocated) {
-            throw std::runtime_error("storage state an optimized");
+            throw std::runtime_error("storage in optimized state");
         }
         return nullptr;
     }
@@ -307,8 +313,7 @@ namespace just {
     // method for fast get hash from string
     method inline int just_string_to_hash_fast(const char* content, int contentLength = INT32_MAX)
     {
-        int x, y;
-        y = (x = x == x) ^ x; // init a x, y variable
+        int x = 1, y = 0;
         while (*(content) && y++ < contentLength)
             x *= *content;
         return x;
@@ -346,7 +351,7 @@ namespace just {
             return true;
         if (!strncmp(content, just_syntax.just_false_string, *getLength = sizeof(just_syntax.just_false_string) - 1))
             return true;
-        *getLength ^= *getLength;
+        *getLength = 0;
         return false;
     }
 
@@ -354,10 +359,8 @@ namespace just {
     method int just_get_format(const char* content, just_storage** storage, JustType& containType, jvariant* outValue = nullptr)
     {
         int x;
-        int offset;
+        int offset = 0;
         void* mem;
-
-        offset ^= offset; // set to zero
 
         // Null type
         if (content == nullptr || *content == '\0') {
@@ -367,7 +370,7 @@ namespace just {
             if (storage) {
                 jbool conv = (offset == sizeof(just_syntax.just_true_string) - 1);
                 // Copy to
-                mem = std::memcpy(storage_alloc_get(storage, containType), &conv, just_type_size(containType));
+                mem = std::memcpy(storage_alloc_node(storage, containType), &conv, just_type_size(containType));
                 if (outValue)
                     *outValue = mem;
             }
@@ -377,7 +380,7 @@ namespace just {
             if (storage) {
                 jnumber conv = std::atoll(content);
                 // Copy to
-                mem = std::memcpy(storage_alloc_get(storage, containType), &conv, just_type_size(containType));
+                mem = std::memcpy(storage_alloc_node(storage, containType), &conv, just_type_size(containType));
                 if (outValue)
                     *outValue = mem;
             }
@@ -386,7 +389,7 @@ namespace just {
             if (storage) {
                 jreal conv = std::atof(content);
                 // Copy to
-                mem = std::memcpy(storage_alloc_get(storage, containType), &conv, just_type_size(containType));
+                mem = std::memcpy(storage_alloc_node(storage, containType), &conv, just_type_size(containType));
                 if (outValue)
                     *outValue = mem;
             }
@@ -402,14 +405,14 @@ namespace just {
                     // TODO: Go support next for string. '\n' '\r' .etc.
                     jstring stringSyntax;
                     stringSyntax.reserve(offset);
-                    for (x ^= x; x < offset; ++x) {
+                    for (x = 0; x < offset; ++x) {
                         if (content[x + 1] == just_syntax.just_left_seperator)
                             ++x;
                         stringSyntax.push_back(content[x + 1]);
                     }
 
                     // Copy to
-                    mem = std::memcpy(storage_alloc_get(storage, containType, stringSyntax.size()), stringSyntax.data(), stringSyntax.size());
+                    mem = std::memcpy(storage_alloc_node(storage, containType, stringSyntax.size()), stringSyntax.data(), stringSyntax.size());
                     if (outValue)
                         *outValue = mem;
                 }
@@ -432,11 +435,10 @@ namespace just {
     // method for trim tabs, space, EOL (etc) to skip.
     method int just_trim(const char* content, int contentLength = INT_MAX)
     {
-        int x, y;
-        x ^= x;
+        int x = 0;
         if (content != nullptr)
-            for (; x < contentLength && *content;) {
-                for (y ^= y; y < static_cast<int>(sizeof(just_syntax.just_trim_segments));)
+            for (int y; x < contentLength && *content;) {
+                for (y = 0; y < static_cast<int>(sizeof(just_syntax.just_trim_segments));)
                     if (*content == just_syntax.just_trim_segments[y])
                         break;
                     else
@@ -454,11 +456,11 @@ namespace just {
     {
         int x, y;
         char skipping[sizeof(just_syntax.just_trim_segments) + sizeof(just_syntax.just_block_segments)];
-        *skipping ^= *skipping;
+        *skipping = 0;
         strncpy(skipping, just_syntax.just_trim_segments, sizeof(just_syntax.just_trim_segments));
         strncpy(skipping + sizeof just_syntax.just_trim_segments, just_syntax.just_block_segments, sizeof(just_syntax.just_block_segments));
-        for (x ^= x; c[x] && x <= len;) {
-            for (y ^= y; y < sizeof(skipping);)
+        for (x = 0; c[x] && x <= len;) {
+            for (y = 0; y < sizeof(skipping);)
                 if (c[x] == skipping[y])
                     break;
                 else
@@ -471,11 +473,11 @@ namespace just {
         return x;
     }
 
-    method inline jbool just_valid_property_name(const char* abstractContent, int len)
+    method inline jbool just_valid_property_name(const char* c, int len)
     {
         int x;
-        for (x ^= x; x < len; ++x, ++abstractContent)
-            if (!((*abstractContent >= *just_syntax.just_valid_property_name && *abstractContent <= just_syntax.just_valid_property_name[1]) || (x && just_is_unsigned_jnumber(*abstractContent)) || *abstractContent == just_syntax.just_valid_property_name[2]))
+        for (x = 0; x < len; ++x, ++c)
+            if (!((*c >= *just_syntax.just_valid_property_name && *c <= just_syntax.just_valid_property_name[1]) || (x && just_is_unsigned_jnumber(*c)) || *c == just_syntax.just_valid_property_name[2]))
                 return false;
         return len != 0;
     }
@@ -494,11 +496,12 @@ namespace just {
     // method for skip comment's
     method int just_autoskip_comment(const char* src, int len)
     {
-        int offset, skipped;
+        int offset;
         const char* pointer = src;
-        pointer += offset = just_trim(pointer, len - offset);
+        pointer += offset = just_trim(pointer, len);
         while (just_is_comment_line(pointer, len - offset)) {
             // skip to EOL
+            int skipped;
             pointer += skipped = just_has_eol(pointer, len - offset);
             offset += skipped;
             // trimming
@@ -524,12 +527,8 @@ namespace just {
         jbool result = false;
 
         if (*content == *just_syntax.just_block_segments) {
-            x = x == x;
-            x += just_trim(content + x);
-
+            x = 1;
             x += just_autoskip_comment(content + x, contentLength - x);
-            x += just_trim(content + x);
-
             if (just_has_datatype(content + x) || content[x] == just_syntax.just_block_segments[1]) {
                 for (; content[x] && x < contentLength; ++x) {
                     if (content[x] == just_syntax.just_block_segments[0])
@@ -559,22 +558,63 @@ namespace just {
 
     method jbool just_object_node::has_tree() const { throw std::runtime_error("This is method not implemented"); }
 
+    jstring just_object_node::to_string() const
+    {
+        switch (type()) {
+        case JustType::JustString:
+            return get_str();
+        case JustType::JustNumber:
+            return std::to_string(get_int());
+        case JustType::JustBoolean:
+            return std::to_string(get_bool());
+        case JustType::JustReal:
+            return std::to_string(get_real());
+        case JustType::Unknown:
+            return jstring(just_syntax.just_unknown_string);
+        case JustType::Null:
+            return jstring(just_syntax.just_null_string);
+        }
+        return jstring();
+    }
+
+    just_object_node::operator jnumber() const
+    {
+        return get_int();
+    }
+
+    just_object_node::operator jbool() const
+    {
+        return get_bool();
+    }
+
+    just_object_node::operator jreal() const
+    {
+        return get_real();
+    }
+
+    just_object_node::operator jstring() const
+    {
+        return get_str();
+    }
+
     method const jstring just_object_node::name() const { return jstring(static_cast<char*>(var)); }
 
-    method int just_avail_only(just_evaluated& eval, const char* source, int length, int depth)
+    method void just_avail_only(just_stats& jstat, const char* source, int length)
     {
-        int x, y, z;
+        int x, z;
+        int depth; // depths
         JustType valueType;
         JustType current_block_type;
         const char* pointer = source;
+        const char* epointer = source + length;
+        // TODO: Linear load
 
-        // base step
-        if (!length)
-            return 0;
+        std::vector<jvariant> stack;
+        stack.reserve(32);
 
-        for (x ^= x; x < length;) {
+        for (depth = x = 0; pointer < epointer;) {
             // has comment line
-            y = x += just_autoskip_comment(pointer + x, length - x);
+            int y = x += just_autoskip_comment(pointer + x, length - x);
             if (depth > 0 && pointer[x] == just_syntax.just_block_segments[1])
                 break;
             x += just_skip(pointer + x, length - x);
@@ -588,7 +628,7 @@ namespace just {
 
             //  has comment line
             x += just_autoskip_comment(pointer + x, length - x);
-            x += just_trim(pointer + x, length - x); // trim string
+            // x += just_trim(pointer + x, length - x); // trim string
             // is block or array
             if (pointer[x] == *just_syntax.just_block_segments) {
                 if (just_is_array(pointer + x, y, length - x)) {
@@ -610,16 +650,16 @@ namespace just {
                                     current_block_type = valueType;
                                     switch (current_block_type) {
                                     case JustType::JustString:
-                                        ++eval.jarrstrings;
+                                        ++jstat.jarrstrings;
                                         break;
                                     case JustType::JustBoolean:
-                                        ++eval.jarrbools;
+                                        ++jstat.jarrbools;
                                         break;
                                     case JustType::JustReal:
-                                        ++eval.jarrreals;
+                                        ++jstat.jarrreals;
                                         break;
                                     case JustType::JustNumber:
-                                        ++eval.jarrnumbers;
+                                        ++jstat.jarrnumbers;
                                         break;
                                     }
                                 }
@@ -629,19 +669,19 @@ namespace just {
 
                                 switch (current_block_type) {
                                 case JustType::JustString:
-                                    eval.jarrstrings_total_bytes += z - 1;
+                                    jstat.jarrstrings_total_bytes += z - 1;
                                     // prototype_node.set_native_memory((void*)jalloc<std::vector<jstring>>());
                                     break;
                                 case JustType::JustBoolean:
-                                    eval.jarrbools_total_bytes += z;
+                                    jstat.jarrbools_total_bytes += z;
                                     // prototype_node.set_native_memory((void*)jalloc<std::vector<jbool>>());
                                     break;
                                 case JustType::JustReal:
-                                    eval.jarrreals_total_bytes += z;
+                                    jstat.jarrreals_total_bytes += z;
                                     // prototype_node.set_native_memory((void*)jalloc<std::vector<jreal>>());
                                     break;
                                 case JustType::JustNumber:
-                                    eval.jarrnumbers_total_bytes += z;
+                                    jstat.jarrnumbers_total_bytes += z;
                                     // prototype_node.set_native_memory((void*)jalloc<std::vector<jnumber>>());
                                     break;
                                 }
@@ -650,13 +690,17 @@ namespace just {
                         x += just_autoskip_comment(pointer + x, y - x);
                     }
 
-                } else { // get the next node
+                } else { // enter the next node
                     ++x;
-                    x += just_avail_only(eval, pointer + x, length - x, depth + 1);
-                    x += just_autoskip_comment(pointer + x, length - x);
+                    // up next node
+                    // x += just_avail_only(jstat, pointer + x, length - x);
+
+                    ++depth;
+                    // x += just_autoskip_comment(pointer + x, length - x);
                 }
 
                 if (pointer[x] != just_syntax.just_block_segments[1]) {
+                    // Error: Line in require end depth
                     throw std::bad_exception();
                 }
                 ++x;
@@ -665,20 +709,20 @@ namespace just {
 
                 switch (valueType) {
                 case JustType::JustString:
-                    ++eval.jstrings;
-                    eval.jarrnumbers_total_bytes += z - 1;
+                    ++jstat.jstrings;
+                    jstat.jarrnumbers_total_bytes += z - 1;
                     break;
                 case JustType::JustBoolean:
-                    ++eval.jbools;
-                    eval.jarrbools_total_bytes += z;
+                    ++jstat.jbools;
+                    jstat.jarrbools_total_bytes += z;
                     break;
                 case JustType::JustReal:
-                    ++eval.jreals;
-                    eval.jarrreals_total_bytes += z;
+                    ++jstat.jreals;
+                    jstat.jarrreals_total_bytes += z;
                     break;
                 case JustType::JustNumber:
-                    ++eval.jnumbers;
-                    eval.jarrnumbers_total_bytes += z;
+                    ++jstat.jnumbers;
+                    jstat.jarrnumbers_total_bytes += z;
                     break;
                 }
 
@@ -698,15 +742,13 @@ namespace just {
                     _dbgLastNode = &_curIter->second;
             #endif
             */
-            x += just_autoskip_comment(pointer + x, length - x);
+            // x += just_autoskip_comment(pointer + x, length - x);
         }
-
-        return x;
     }
 
     // big algorithm, please free me.
     // divide and conquer method avail
-    method int just_avail(just_storage** storage, just_evaluated& eval, const char* source, int length, int depth)
+    method int just_avail(just_storage** storage, just_stats& eval, const char* source, int length, int depth)
     {
         int x, y;
         const char* pointer;
@@ -723,7 +765,7 @@ namespace just {
 
         pointer = source;
 
-        for (x ^= x; x < length;) {
+        for (x = 0; x < length;) {
             // skip and trimming
             y = x += just_autoskip_comment(pointer + x, length - x);
             if (depth > 0 && pointer[x] == just_syntax.just_block_segments[1])
@@ -858,11 +900,19 @@ namespace just {
         return x;
     }
 
-    just_object_parser::just_object_parser(JustAllocationMethod allocationMethod)
+    just_object_parser::just_object_parser()
+        : just_object_parser::just_object_parser(JustAllocationMethod::dynamic_allocation)
     {
     }
 
-    method void just_object_parser::deserialize_from(const char* filename)
+    just_object_parser::just_object_parser(JustAllocationMethod allocationMethod)
+    {
+        _storage = nullptr;
+    }
+
+    just_object_parser::~just_object_parser() { }
+
+    method void just_object_parser::deserialize_from(const jstring& filename)
     {
         long length;
         char* buffer;
@@ -898,7 +948,7 @@ namespace just {
     method void just_object_parser::deserialize(const char* source, int len)
     {
         // FIXME: CLEAR FUNCTION IS UPGRADE
-        just_evaluated eval = {};
+        just_stats eval = {};
         entry.clear(); // clears alls
 
         if (_storage) {
@@ -907,7 +957,7 @@ namespace just {
 
         // init storage
         _storage = storage_new_init();
-        just_avail_only(eval, source, len, 0);
+        just_avail_only(eval, source, len);
     }
     method jstring just_object_parser::serialize(JustSerializeFormat format) const
     {
@@ -947,13 +997,8 @@ namespace just {
         just_object_node* node = nullptr;
         std::add_pointer<decltype(this->entry)>::type entry = &this->entry;
         decltype(entry->begin()) iter;
-        int alpha, beta;
+        int alpha = 0, beta;
         int hash;
-
-        // set l to 0 (zero value).
-        // NOTE: Alternative answer for new method.
-        alpha ^= alpha;
-
         // get splits
         do {
             if ((beta = nodePath.find(just_syntax.just_nodePathBreaker, alpha)) == ~0)
@@ -986,16 +1031,16 @@ namespace just {
     {
         switch (node.type()) {
         case JustType::JustNumber:
-            out << node.value<jnumber>();
+            out << static_cast<jnumber>(node);
             break;
         case JustType::JustBoolean:
-            out << node.value<jbool>();
+            out << static_cast<jbool>(node);
             break;
         case JustType::JustReal:
-            out << node.value<jreal>();
+            out << static_cast<jreal>(node);
             break;
         case JustType::JustString:
-            out << node.value<jstring>();
+            out << static_cast<jstring>(node);
             break;
         case JustType::Unknown:
             out << just_syntax.just_unknown_string;
@@ -1017,6 +1062,22 @@ namespace just {
         return out;
     }
 
+    const jnumber just_object_node::get_int() const
+    {
+        return *static_cast<jnumber*>(var);
+    }
+    const jbool just_object_node::get_bool() const
+    {
+        return *static_cast<jbool*>(var);
+    }
+    const jstring just_object_node::get_str() const
+    {
+        return jstring(static_cast<char*>(var));
+    }
+    const jreal just_object_node::get_real() const
+    {
+        return *static_cast<jreal*>(var);
+    }
 } // namespace just
 
 #undef method
