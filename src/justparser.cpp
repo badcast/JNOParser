@@ -36,11 +36,7 @@ namespace just
 
     typedef std::vector<int> jtree_t;
 
-    enum {
-        Node_ValueFlag = 1,
-        Node_ArrayFlag = 2,
-        Node_TreeFlag = 3
-    };
+    enum { Node_ValueFlag = 1, Node_ArrayFlag = 2, Node_TreeFlag = 3 };
 
     // NOTE: storage description
     /*
@@ -58,13 +54,17 @@ namespace just
             - Tree for node
                 - How to get answer ? First use unsigned int as pointer in linear.
 
+            VAULT:
+            - bools(1), numbers(2), reals(3), strings(4), trees(5)
+            -
+
     */
 
     struct just_storage {
         // up members  : meta-info
         // down members: size-info
         std::uint8_t just_allocated;
-        jnumber numBools, numNumbers, numReals, numStrings, arrayBools, arrayNumbers, arrayReals, arrayStrings, numProperties;
+        jnumber numBools, numNumbers, numReals, numStrings, numTrees, arrayBools, arrayNumbers, arrayReals, arrayStrings, just;
     };
 
     static const struct {
@@ -87,43 +87,35 @@ namespace just
     // TODO: Get status messages
     // static const struct { const char* msg_multitype_cast = ""; } just_error_msg;
 
-    template <typename T>
-    struct get_type {
+    template <typename T> struct get_type {
         static constexpr JustType type = JustType::Unknown;
     };
 
-    template <>
-    struct get_type<void> {
+    template <> struct get_type<void> {
         static constexpr JustType type = JustType::Null;
     };
 
-    template <>
-    struct get_type<int> {
+    template <> struct get_type<int> {
         static constexpr JustType type = JustType::JustNumber;
     };
 
-    template <>
-    struct get_type<float> {
+    template <> struct get_type<float> {
         static constexpr JustType type = JustType::JustReal;
     };
 
-    template <>
-    struct get_type<double> {
+    template <> struct get_type<double> {
         static constexpr JustType type = JustType::JustReal;
     };
 
-    template <>
-    struct get_type<bool> {
+    template <> struct get_type<bool> {
         static constexpr JustType type = JustType::JustBoolean;
     };
 
-    template <>
-    struct get_type<jstring> {
+    template <> struct get_type<jstring> {
         static constexpr JustType type = JustType::JustString;
     };
 
-    template <>
-    struct get_type<const char*> {
+    template <> struct get_type<const char*> {
         static constexpr JustType type = JustType::JustString;
     };
 
@@ -136,6 +128,8 @@ namespace just
             return sizeof(jnumber);
         case JustType::JustReal:
             return sizeof(jreal);
+        case JustType::JustTree:
+            return sizeof(jtree_t);
         }
         return 0;
     }
@@ -208,16 +202,20 @@ namespace just
     }
 
     // Get storage size from type order
-    method std::uint32_t storage_calc_size(const just_storage* pstorage, JustType type)
+    method std::uint32_t storage_vault_info(const just_storage* pstorage, int flags)
     {
         std::uint32_t calcSize;
 
+        JustType type = static_cast<JustType>(flags & 0xFF);
+
         if (!pstorage)
-            throw std::runtime_error("Memory is undefined");
+            throw std::bad_alloc();
 
         if (type > JustType::Null) {
             // move pointer to ...
             const jnumber* alpha = reinterpret_cast<const jnumber*>(static_cast<const void*>(pstorage) + sizeof(pstorage->just_allocated)) + static_cast<int>(type);
+
+            // low - count ~ high - sizes (all bytes)
             calcSize = (*alpha) >> 32;
         } else {
             // set to zero
@@ -227,11 +225,18 @@ namespace just
         return calcSize;
     }
 
-    method jnode_t storage_alloc_field(just_storage** pstore, JustType type, int allocSize = 0)
+    method jvariant storage_get_vault(just_storage* pstorage, const JustType type)
     {
-#define store (*pstore)
-#define _addNumber(plot) ()
+        if (type < JustType::JustBoolean)
+            // vault is not supported
+            return nullptr;
 
+        jvariant _vp = reinterpret_cast<jvariant>((static_cast<jvariant>(pstorage + 1) + type * sizeof(void*)));
+        return _vp;
+    }
+
+    method jvariant storage_alloc_field(just_storage** pstore, JustType type, int size = 0)
+    {
         if (pstore == nullptr || *pstore == nullptr)
             throw std::bad_alloc();
 
@@ -243,39 +248,57 @@ namespace just
         // Low bytes: count
         // High bytes: size
         // Check
-        auto calc = storage_calc_size(store, type);
+        jvariant _vault;
 
-        void* _vault = store + 1;
-        void* newAllocated;
-        int vaultSize;
+        _vault = storage_get_vault(*pstore, type);
 
-        if (allocSize <= 0)
-            allocSize = just_type_size(type);
+        if (!_vault)
+            return _vault;
 
-        newAllocated = std::realloc(_vault, allocSize);
+        if (type == JustType::JustTree) { // can be realloc ?
+            // for tree
+            jvariant lptr = new jtree_t;
+            std::memcpy(&_vault, static_cast<jvariant>(&lptr), sizeof(jvariant));
+            ++(*pstore)->numTrees;
+        } else { // for primary types
 
-        if (newAllocated) {
-            switch (type) {
-            case JustType::JustBoolean:
-                ++store->numBools;
-            case JustType::JustNumber:
-                ++store->numNumbers;
-            case JustType::JustReal:
-                ++store->numReals;
-            case JustType::JustString:
-                ++store->numStrings;
-            default:
-                throw std::bad_cast();
+            if (size <= 0) {
+                if (type == JustType::JustString) {
+                    // Error. String size is empty
+                    return nullptr;
+                }
+                size = just_type_size(type);
             }
+
+            // vault after changed
+            jvariant _chVault = std::realloc(_vault, size);
+            if (_chVault) {
+                // set as zero
+                std::memset(_chVault, 0, size);
+
+                switch (type) {
+                case JustType::JustBoolean:
+                    ++(*pstore)->numBools;
+                case JustType::JustNumber:
+                    ++(*pstore)->numNumbers;
+                case JustType::JustReal:
+                    ++(*pstore)->numReals;
+                case JustType::JustString:
+                    ++(*pstore)->numStrings;
+                default:
+                    throw std::bad_cast();
+                }
+            }
+            _vault = _chVault;
         }
-        return newAllocated;
-#undef store
+
+        return _vault;
     }
 
     // Create Main Tree
-    method jtree_t* storage_alloc_tree(just_storage** pstore, jtree_t* owner = nullptr)
+    method jtree_t* storage_alloc_tree(just_storage** pstore, const jtree_t* owner = nullptr)
     {
-        jtree_t* treed;
+        jtree_t* newTree;
 
         if (pstore == nullptr || *pstore == nullptr)
             throw std::bad_alloc();
@@ -284,12 +307,11 @@ namespace just
             throw std::runtime_error("storage in optimized state");
         }
 
-        jnode_t _node = storage_alloc_field();
+        newTree = static_cast<jtree_t*>(storage_alloc_field(pstore, JustType::JustTree));
 
-        if (owner != nullptr) {
-        }
+        if (owner != nullptr) { }
 
-        return treed;
+        return newTree;
     }
 
     // Create Array Node
@@ -597,25 +619,13 @@ namespace just
         return jstring();
     }
 
-    just_object_node::operator jnumber() const
-    {
-        return get_int();
-    }
+    just_object_node::operator jnumber() const { return get_int(); }
 
-    just_object_node::operator jbool() const
-    {
-        return get_bool();
-    }
+    just_object_node::operator jbool() const { return get_bool(); }
 
-    just_object_node::operator jreal() const
-    {
-        return get_real();
-    }
+    just_object_node::operator jreal() const { return get_real(); }
 
-    just_object_node::operator jstring() const
-    {
-        return get_str();
-    }
+    just_object_node::operator jstring() const { return get_str(); }
 
     method const jstring just_object_node::name() const { return jstring(static_cast<char*>(_jhead)); }
 
@@ -633,7 +643,6 @@ namespace just
         // TODO: Linear load
 
         pstorage = storage_new_init();
-        stack.reserve(32);
         stack.emplace_back(storage_alloc_tree(&pstorage));
 
         for (depth = x = 0; pointer < epointer;) {
@@ -929,10 +938,7 @@ namespace just
     {
     }
 
-    just_object_parser::just_object_parser(JustAllocationMethod allocationMethod)
-    {
-        _storage = nullptr;
-    }
+    just_object_parser::just_object_parser(JustAllocationMethod allocationMethod) { _storage = nullptr; }
 
     just_object_parser::~just_object_parser() { }
 
@@ -1086,22 +1092,10 @@ namespace just
         return out;
     }
 
-    const jnumber just_object_node::get_int() const
-    {
-        return *static_cast<jnumber*>(_jhead);
-    }
-    const jbool just_object_node::get_bool() const
-    {
-        return *static_cast<jbool*>(_jhead);
-    }
-    const jstring just_object_node::get_str() const
-    {
-        return jstring(static_cast<char*>(_jhead));
-    }
-    const jreal just_object_node::get_real() const
-    {
-        return *static_cast<jreal*>(_jhead);
-    }
+    const jnumber just_object_node::get_int() const { return *static_cast<jnumber*>(_jhead); }
+    const jbool just_object_node::get_bool() const { return *static_cast<jbool*>(_jhead); }
+    const jstring just_object_node::get_str() const { return jstring(static_cast<char*>(_jhead)); }
+    const jreal just_object_node::get_real() const { return *static_cast<jreal*>(_jhead); }
 } // namespace just
 
 #undef method

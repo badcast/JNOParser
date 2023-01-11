@@ -14,20 +14,21 @@
 #include <stdexcept>
 #include <type_traits>
 
-namespace just {
+namespace just
+{
     class just_object_parser;
     class just_object_node;
 
     /// undefined type
-    typedef void*           jvariant;
+    typedef void* jvariant;
     /// string type
-    typedef std::string     jstring;
+    typedef std::string jstring;
     /// integer type
-    typedef std::int64_t    jnumber;
+    typedef std::int64_t jnumber;
     /// real type
-    typedef double          jreal;
+    typedef double jreal;
     /// logical type
-    typedef bool            jbool;
+    typedef bool jbool;
 
     using jstruct = std::map<int, just_object_node>;
 
@@ -47,23 +48,24 @@ namespace just {
 
     /* standart Just types */
     enum JustType : std::int8_t {
-        //Unknown type of object
+        // Unknown type of object
         Unknown = -1,
-        //Null empty type
+        // Null empty type
         Null = 0,
-        //Boolean object
-        JustBoolean,
-        //Number object
-        JustNumber,
-        //Floating point object
-        JustReal,
-        //String object
-        JustString,
-        //Have a tree object
-        JustTree
+        // Boolean object
+        JustBoolean = 1,
+        // Number object
+        JustNumber = 2,
+        // Floating point object
+        JustReal = 3,
+        // String object
+        JustString = 4,
+        // Have a tree object
+        JustTree = 5
     };
 
-    class just_object_node {
+    class just_object_node
+    {
         friend class just_object_parser;
 
     protected:
@@ -93,25 +95,25 @@ namespace just {
         // Property 'has_value' is the value from this Node
         jbool has_value() const;
 
-//        const jnumber value() const
-//        {
-//            return static_cast<jnumber>(get_int());
-//        }
+        //        const jnumber value() const
+        //        {
+        //            return static_cast<jnumber>(get_int());
+        //        }
 
-//        const jbool value() const
-//        {
-//            return static_cast<jbool>(get_bool());
-//        }
+        //        const jbool value() const
+        //        {
+        //            return static_cast<jbool>(get_bool());
+        //        }
 
-//        const jreal value() const
-//        {
-//            return static_cast<jreal>(get_real());
-//        }
+        //        const jreal value() const
+        //        {
+        //            return static_cast<jreal>(get_real());
+        //        }
 
-//        const jstring value() const
-//        {
-//            return static_cast<jstring>(get_str());
-//        }
+        //        const jstring value() const
+        //        {
+        //            return static_cast<jstring>(get_str());
+        //        }
 
         jstring to_string() const;
 
@@ -123,7 +125,8 @@ namespace just {
         explicit operator jbool() const;
     };
 
-    class just_object_parser {
+    class just_object_parser
+    {
         friend class just_object_node;
 
     protected:
