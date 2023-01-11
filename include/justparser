@@ -47,20 +47,28 @@ namespace just {
 
     /* standart Just types */
     enum JustType : std::int8_t {
+        //Unknown type of object
         Unknown = -1,
+        //Null empty type
         Null = 0,
+        //Boolean object
         JustBoolean,
+        //Number object
         JustNumber,
+        //Floating point object
         JustReal,
-        JustString
+        //String object
+        JustString,
+        //Have a tree object
+        JustTree
     };
 
     class just_object_node {
         friend class just_object_parser;
 
     protected:
-        just_object_parser* owner;
-        jvariant var = nullptr;
+        just_object_parser* _jowner;
+        jvariant _jhead = nullptr;
 
         just_object_node(just_object_parser* head, void* handle);
 

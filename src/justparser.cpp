@@ -1,15 +1,20 @@
 ﻿/*
-    *** Just Object Parser ***
-    *** Project by badcast <lmecomposer@gmail.com>
-    *** project url: https://github.com/badcast/just-parser
-    *** Project Date: 31.12.2022
-
-*/
+ *** Just Object Parser ***
+ *** Project by badcast <lmecomposer@gmail.com>
+ *** Project url: https://github.com/badcast/just-parser
+ *** Project Date: 31.12.2022
+ ***
+ *** jnode_t = is Node for object
+ *** jtree_t = is Multi jnode_t | Descriptions:  jtree_t have a jnode_t (int) data
+ ***
+ *** jtree_t have a one or multi nodes
+ */
 
 #include <cstdlib>
 #include <vector>
 #include <tuple>
 #include <climits>
+#include <stack>
 
 // import header
 #include "justparser"
@@ -24,9 +29,43 @@
 
 #define MACROPUT(base) #base
 
-namespace just {
+namespace just
+{
+
+    typedef jvariant jnode_t;
 
     typedef std::vector<int> jtree_t;
+
+    enum {
+        Node_ValueFlag = 1,
+        Node_ArrayFlag = 2,
+        Node_TreeFlag = 3
+    };
+
+    // NOTE: storage description
+    /*
+            index  |types
+            -------|----------------
+            0       bools
+            1       numbers
+            2       reals
+            3       strings
+            4       properties
+
+            ------------------------
+            ISSUE:
+            - Organize structure malloc (realloc)
+            - Tree for node
+                - How to get answer ? First use unsigned int as pointer in linear.
+
+    */
+
+    struct just_storage {
+        // up members  : meta-info
+        // down members: size-info
+        std::uint8_t just_allocated;
+        jnumber numBools, numNumbers, numReals, numStrings, arrayBools, arrayNumbers, arrayReals, arrayStrings, numProperties;
+    };
 
     static const struct {
         char just_dot = '.';
@@ -47,10 +86,6 @@ namespace just {
 
     // TODO: Get status messages
     // static const struct { const char* msg_multitype_cast = ""; } just_error_msg;
-
-    enum { Node_ValueFlag = 1,
-        Node_ArrayFlag = 2,
-        Node_StructFlag = 3 };
 
     template <typename T>
     struct get_type {
@@ -104,30 +139,6 @@ namespace just {
         }
         return 0;
     }
-    // NOTE: storage description
-    /*
-        index  |types
-        -------|----------------
-        0       bools
-        1       numbers
-        2       reals
-        3       strings
-        4       properties
-
-        ------------------------
-        ISSUE:
-        - Organize structure malloc (realloc)
-        - Tree for node
-            - How to get answer ? First use unsigned int as pointer in linear.
-
-    */
-
-    struct just_storage {
-        // up members  : meta-info
-        // down members: size-info
-        std::uint8_t just_allocated;
-        jnumber numBools, numNumbers, numReals, numStrings, arrayBools, arrayNumbers, arrayReals, arrayStrings, numProperties;
-    };
 
     struct just_stats {
         std::uint16_t jstrings;
@@ -191,6 +202,8 @@ namespace just {
         pgSize = sizeof(just_storage) > pgSize ? sizeof(just_storage) : pgSize;
         if (!(ptr = std::malloc(pgSize)))
             throw std::bad_alloc();
+
+        // init as 0
         return static_cast<just_storage*>(std::memset(ptr, 0, pgSize));
     }
 
@@ -214,7 +227,7 @@ namespace just {
         return calcSize;
     }
 
-    method jvariant storage_alloc_node(just_storage** pstore, JustType type, int allocSize = Null)
+    method jnode_t storage_alloc_field(just_storage** pstore, JustType type, int allocSize = 0)
     {
 #define store (*pstore)
 #define _addNumber(plot) ()
@@ -235,41 +248,48 @@ namespace just {
         void* _vault = store + 1;
         void* newAllocated;
         int vaultSize;
+
         if (allocSize <= 0)
             allocSize = just_type_size(type);
 
         newAllocated = std::realloc(_vault, allocSize);
 
-        if (!newAllocated)
-            return newAllocated; // bad alloc
-        _vault = newAllocated;
-        switch (type) {
-        case JustType::JustBoolean:
-            _vault = std::realloc(_vault, allocSize);
-            ++store->numBools;
-        case JustType::JustNumber:
-            ++store->numNumbers;
-        case JustType::JustReal:
-            ++store->numReals;
-        case JustType::JustString:
-            ++store->numStrings;
-        case JustType::Unknown:
-        case JustType::Null:
-            throw std::bad_cast();
+        if (newAllocated) {
+            switch (type) {
+            case JustType::JustBoolean:
+                ++store->numBools;
+            case JustType::JustNumber:
+                ++store->numNumbers;
+            case JustType::JustReal:
+                ++store->numReals;
+            case JustType::JustString:
+                ++store->numStrings;
+            default:
+                throw std::bad_cast();
+            }
         }
+        return newAllocated;
 #undef store
     }
 
     // Create Main Tree
-    method jtree_t* storage_alloc_tree(just_storage** pstore)
+    method jtree_t* storage_alloc_tree(just_storage** pstore, jtree_t* owner = nullptr)
     {
+        jtree_t* treed;
+
         if (pstore == nullptr || *pstore == nullptr)
             throw std::bad_alloc();
 
         if ((*pstore)->just_allocated) {
             throw std::runtime_error("storage in optimized state");
         }
-        return nullptr;
+
+        jnode_t _node = storage_alloc_field();
+
+        if (owner != nullptr) {
+        }
+
+        return treed;
     }
 
     // Create Array Node
@@ -359,8 +379,8 @@ namespace just {
     method int just_get_format(const char* content, just_storage** storage, JustType& containType, jvariant* outValue = nullptr)
     {
         int x;
-        int offset = 0;
         void* mem;
+        int offset = 0;
 
         // Null type
         if (content == nullptr || *content == '\0') {
@@ -370,7 +390,7 @@ namespace just {
             if (storage) {
                 jbool conv = (offset == sizeof(just_syntax.just_true_string) - 1);
                 // Copy to
-                mem = std::memcpy(storage_alloc_node(storage, containType), &conv, just_type_size(containType));
+                mem = std::memcpy(storage_alloc_field(storage, containType), &conv, just_type_size(containType));
                 if (outValue)
                     *outValue = mem;
             }
@@ -380,7 +400,7 @@ namespace just {
             if (storage) {
                 jnumber conv = std::atoll(content);
                 // Copy to
-                mem = std::memcpy(storage_alloc_node(storage, containType), &conv, just_type_size(containType));
+                mem = std::memcpy(storage_alloc_field(storage, containType), &conv, just_type_size(containType));
                 if (outValue)
                     *outValue = mem;
             }
@@ -389,7 +409,7 @@ namespace just {
             if (storage) {
                 jreal conv = std::atof(content);
                 // Copy to
-                mem = std::memcpy(storage_alloc_node(storage, containType), &conv, just_type_size(containType));
+                mem = std::memcpy(storage_alloc_field(storage, containType), &conv, just_type_size(containType));
                 if (outValue)
                     *outValue = mem;
             }
@@ -412,7 +432,7 @@ namespace just {
                     }
 
                     // Copy to
-                    mem = std::memcpy(storage_alloc_node(storage, containType, stringSyntax.size()), stringSyntax.data(), stringSyntax.size());
+                    mem = std::memcpy(storage_alloc_field(storage, containType, stringSyntax.size()), stringSyntax.data(), stringSyntax.size());
                     if (outValue)
                         *outValue = mem;
                 }
@@ -548,11 +568,11 @@ namespace just {
 
     just_object_node::just_object_node(just_object_parser* owner, void* handle)
     {
-        this->owner = owner;
-        this->var = handle;
+        this->_jowner = owner;
+        this->_jhead = handle;
     }
 
-    method JustType just_object_node::type() const { just_get_type(var, static_cast<just_storage*>(this->owner->_storage)); }
+    method JustType just_object_node::type() const { just_get_type(_jhead, static_cast<just_storage*>(this->_jowner->_storage)); }
 
     method just_object_node* just_object_node::tree(const jstring& child) { return nullptr; }
 
@@ -597,7 +617,7 @@ namespace just {
         return get_str();
     }
 
-    method const jstring just_object_node::name() const { return jstring(static_cast<char*>(var)); }
+    method const jstring just_object_node::name() const { return jstring(static_cast<char*>(_jhead)); }
 
     method void just_avail_only(just_stats& jstat, const char* source, int length)
     {
@@ -605,12 +625,16 @@ namespace just {
         int depth; // depths
         JustType valueType;
         JustType current_block_type;
+        just_storage* pstorage;
+        std::vector<jtree_t*> stack;
         const char* pointer = source;
         const char* epointer = source + length;
+
         // TODO: Linear load
 
-        std::vector<jvariant> stack;
+        pstorage = storage_new_init();
         stack.reserve(32);
+        stack.emplace_back(storage_alloc_tree(&pstorage));
 
         for (depth = x = 0; pointer < epointer;) {
             // has comment line
@@ -1064,19 +1088,19 @@ namespace just {
 
     const jnumber just_object_node::get_int() const
     {
-        return *static_cast<jnumber*>(var);
+        return *static_cast<jnumber*>(_jhead);
     }
     const jbool just_object_node::get_bool() const
     {
-        return *static_cast<jbool*>(var);
+        return *static_cast<jbool*>(_jhead);
     }
     const jstring just_object_node::get_str() const
     {
-        return jstring(static_cast<char*>(var));
+        return jstring(static_cast<char*>(_jhead));
     }
     const jreal just_object_node::get_real() const
     {
-        return *static_cast<jreal*>(var);
+        return *static_cast<jreal*>(_jhead);
     }
 } // namespace just
 
