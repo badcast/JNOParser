@@ -15,7 +15,7 @@
 #include <tuple>
 #include <climits>
 #include <stack>
-
+        #include <iostream>
 // import header
 #include "justparser"
 
@@ -31,12 +31,11 @@
 
 namespace just
 {
-
     typedef jvariant jnode_t;
-
     typedef std::vector<int> jtree_t;
 
     enum { Node_ValueFlag = 1, Node_ArrayFlag = 2, Node_TreeFlag = 3 };
+    enum { Invalid_IPT = -1 };
 
     // NOTE: storage description
     /*
@@ -59,65 +58,81 @@ namespace just
             -
 
     */
-
     struct just_storage {
+
+        // Has storage state
+        std::uint8_t optimized;
+
         // up members  : meta-info
         // down members: size-info
-        std::uint8_t just_allocated;
         jnumber numBools, numNumbers, numReals, numStrings, numTrees, arrayBools, arrayNumbers, arrayReals, arrayStrings, just;
     };
 
     static const struct {
+        // member for use floating point (delimeter)
         char just_dot = '.';
+        // member for use seperate array data
         char just_obstacle = ',';
+        // member for use path breaker in tree. see. just_object_node::at()
         char just_nodePathBreaker = '/';
+        // member for use comment breaker
         char just_commentLine[3] = "//";
+        // member for use Screening character symbol (\n, \r, \m, etc.)
         char just_left_seperator = '\\';
+        // member for use end of line (EOF).
         char just_eol_segment = '\n';
+        // member for use string compact
         char just_format_string = '\"';
+        // member for use boolean data (true)
         char just_true_string[5] = MACROPUT(true);
+        // member for use boolean data (false)
         char just_false_string[6] = MACROPUT(false);
+        // member for use null data (not defined type)
         char just_null_string[5] = MACROPUT(null);
+        // member for use unknown type (use as string member)
         char just_unknown_string[6] { "{...}" };
+        // member for use block or array first/end segments
         char just_block_segments[2] { '{', '}' };
+        // member for use trimming characters
         char just_trim_segments[5] { 32, '\t', '\n', '\r', '\v' };
+        // member for use valid property name (not use "_" as first word)
         char just_valid_property_name[3] = { 'A', 'z', '_' };
     } just_syntax;
 
     // TODO: Get status messages
     // static const struct { const char* msg_multitype_cast = ""; } just_error_msg;
 
-    template <typename T> struct get_type {
-        static constexpr JustType type = JustType::Unknown;
-    };
+    //    template <typename T> struct get_type {
+    //        static constexpr JustType type = JustType::Unknown;
+    //    };
 
-    template <> struct get_type<void> {
-        static constexpr JustType type = JustType::Null;
-    };
+    //    template <> struct get_type<void> {
+    //        static constexpr JustType type = JustType::Null;
+    //    };
 
-    template <> struct get_type<int> {
-        static constexpr JustType type = JustType::JustNumber;
-    };
+    //    template <> struct get_type<int> {
+    //        static constexpr JustType type = JustType::JustNumber;
+    //    };
 
-    template <> struct get_type<float> {
-        static constexpr JustType type = JustType::JustReal;
-    };
+    //    template <> struct get_type<float> {
+    //        static constexpr JustType type = JustType::JustReal;
+    //    };
 
-    template <> struct get_type<double> {
-        static constexpr JustType type = JustType::JustReal;
-    };
+    //    template <> struct get_type<double> {
+    //        static constexpr JustType type = JustType::JustReal;
+    //    };
 
-    template <> struct get_type<bool> {
-        static constexpr JustType type = JustType::JustBoolean;
-    };
+    //    template <> struct get_type<bool> {
+    //        static constexpr JustType type = JustType::JustBoolean;
+    //    };
 
-    template <> struct get_type<jstring> {
-        static constexpr JustType type = JustType::JustString;
-    };
+    //    template <> struct get_type<jstring> {
+    //        static constexpr JustType type = JustType::JustString;
+    //    };
 
-    template <> struct get_type<const char*> {
-        static constexpr JustType type = JustType::JustString;
-    };
+    //    template <> struct get_type<const char*> {
+    //        static constexpr JustType type = JustType::JustString;
+    //    };
 
     method inline int just_type_size(const JustType type)
     {
@@ -152,10 +167,10 @@ namespace just
 
         const jnumber calcBytes() const
         {
-            jnumber sz = 0;
+            jnumber sz;
 
             // calc jstring
-            sz += jstrings_total_bytes;
+            sz = jstrings_total_bytes;
 
             // calc jnumber
             sz += jnumbers * sizeof(jnumber);
@@ -213,7 +228,7 @@ namespace just
 
         if (type > JustType::Null) {
             // move pointer to ...
-            const jnumber* alpha = reinterpret_cast<const jnumber*>(static_cast<const void*>(pstorage) + sizeof(pstorage->just_allocated)) + static_cast<int>(type);
+            const jnumber* alpha = reinterpret_cast<const jnumber*>(static_cast<const void*>(pstorage) + sizeof(pstorage->optimized)) + static_cast<int>(type);
 
             // low - count ~ high - sizes (all bytes)
             calcSize = (*alpha) >> 32;
@@ -240,7 +255,7 @@ namespace just
         if (pstore == nullptr || *pstore == nullptr)
             throw std::bad_alloc();
 
-        if ((*pstore)->just_allocated) {
+        if ((*pstore)->optimized) {
             throw std::runtime_error("storage in optimized state");
         }
 
@@ -295,15 +310,19 @@ namespace just
         return _vault;
     }
 
+    // Method for get Pointer to Input Pointer (IPT). Lowest at pointer
+    method int storage_get_ipt(const just_storage* pstore, const jvariant pointer) { return 0; }
+    // Method from Input Pointer (IPT) to Pointer. Lowest at pointer
+    method jvariant storage_get_pointer(const just_storage* pstore, const int ipt) { return nullptr; }
     // Create Main Tree
     method jtree_t* storage_alloc_tree(just_storage** pstore, const jtree_t* owner = nullptr)
     {
+        int ipt;
         jtree_t* newTree;
-
         if (pstore == nullptr || *pstore == nullptr)
             throw std::bad_alloc();
 
-        if ((*pstore)->just_allocated) {
+        if ((*pstore)->optimized) {
             throw std::runtime_error("storage in optimized state");
         }
 
@@ -322,10 +341,10 @@ namespace just
         return variant;
     }
 
-    // Optimize storage (ordering and compres)
+    // Optimize storage (ordering and compress)
     method bool storage_optimize(just_storage** pstorage)
     {
-        if ((*pstorage)->just_allocated)
+        if ((*pstorage)->optimized)
             return true;
 
         // TODO: optimize here
@@ -334,7 +353,7 @@ namespace just
     // method for get type from pointer (storage required)
     method JustType just_get_type(const void* pointer, just_storage* pstorage)
     {
-        const jnumber* alpha = static_cast<jnumber*>(static_cast<void*>(pstorage) + sizeof(pstorage->just_allocated));
+        const jnumber* alpha = static_cast<jnumber*>(static_cast<void*>(pstorage) + sizeof(pstorage->optimized));
         const void* delta = pstorage + 1;
         int type;
         if (pointer) {
@@ -643,6 +662,7 @@ namespace just
         // TODO: Linear load
 
         pstorage = storage_new_init();
+
         stack.emplace_back(storage_alloc_tree(&pstorage));
 
         for (depth = x = 0; pointer < epointer;) {
@@ -658,6 +678,9 @@ namespace just
 
             // property name
             // prototype_node.propertyName.append(just_source + y, static_cast<size_t>(x - y));
+
+
+                std::cout << jstring(pointer + y, static_cast<size_t>(x - y)) << std::endl;
 
             //  has comment line
             x += just_autoskip_comment(pointer + x, length - x);
@@ -1006,10 +1029,10 @@ namespace just
 
         return data;
     }
-    method just_object_node* just_object_parser::find_node(const jstring& name)
+    method just_object_node* just_object_parser::search(const jstring& pattern)
     {
         just_object_node* node;
-        int hash = just_string_to_hash_fast(name.c_str());
+        int hash = just_string_to_hash_fast(pattern.c_str());
 
         auto iter = this->entry.find(hash);
 
@@ -1051,7 +1074,7 @@ namespace just
         return node;
     }
 
-    method jbool just_object_parser::contains(const jstring& nodePath) { return find_node(nodePath) != nullptr; }
+    method jbool just_object_parser::contains(const jstring& nodePath) { return at(nodePath) != nullptr; }
 
     method just_object_node& operator<<(just_object_node& root, const jstring& nodename) { return *root.tree(nodename); }
 
