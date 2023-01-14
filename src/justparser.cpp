@@ -15,7 +15,7 @@
 #include <tuple>
 #include <climits>
 #include <stack>
-        #include <iostream>
+#include <iostream>
 // import header
 #include "justparser"
 
@@ -679,8 +679,7 @@ namespace just
             // property name
             // prototype_node.propertyName.append(just_source + y, static_cast<size_t>(x - y));
 
-
-                std::cout << jstring(pointer + y, static_cast<size_t>(x - y)) << std::endl;
+            std::cout << jstring(pointer + y, static_cast<size_t>(x - y)) << std::endl;
 
             //  has comment line
             x += just_autoskip_comment(pointer + x, length - x);
