@@ -11,6 +11,8 @@ std::string getExecPath(std::string app, const std::string& combine = "")
     if (!combine.empty())
         app += '/' + combine;
     return app;
+
+    std::is_null_pointer
 }
 
 int main(int argn, char** argv)
