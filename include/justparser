@@ -32,14 +32,14 @@ namespace just
 
     using jstruct = std::map<int, just_object_node>;
 
-    enum JustSerializeFormat {
+    enum class JustSerializeFormat {
         // Just (Just Node Object) a beautify string view
         JustBeautify,
         // Just (Just Node Object) a compact string data for effective communication
         JustCompact
     };
 
-    enum JustAllocationMethod {
+    enum class JustAllocationMethod {
         // dynamic allocation: dynamic deserialization fast and plump loading
         dynamic_allocation,
         // fixed allocation: memory saving, reloading by the "evaluation-conclusion"
@@ -47,7 +47,7 @@ namespace just
     };
 
     /* standart Just types */
-    enum JustType : std::int8_t {
+    enum class JustType : std::int8_t {
         // Unknown type of object
         Unknown = -1,
         // Null empty type
@@ -92,7 +92,7 @@ namespace just
         // Property 'has_tree' defined tree
         jbool has_tree() const;
 
-        // Property 'has_value' is the value from this Node
+        // Property 'has_value' is the value from this tree
         jbool has_value() const;
 
         //        const jnumber value() const

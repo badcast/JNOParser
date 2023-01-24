@@ -5,6 +5,12 @@ project(just-parser LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+if(WIN32)
+    #mingw
+    message("Static windows format")
+    set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} "-static")
+endif()
+
 #stand up test
 enable_testing()
 

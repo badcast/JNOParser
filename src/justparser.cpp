@@ -74,7 +74,7 @@ namespace just
         // member for use seperate array data
         char just_obstacle = ',';
         // member for use path breaker in tree. see. just_object_node::at()
-        char just_nodePathBreaker = '/';
+        char just_tree_pathbrk = '/';
         // member for use comment breaker
         char just_commentLine[3] = "//";
         // member for use Screening character symbol (\n, \r, \m, etc.)
@@ -94,7 +94,7 @@ namespace just
         // member for use block or array first/end segments
         char just_block_segments[2] { '{', '}' };
         // member for use trimming characters
-        char just_trim_segments[5] { 32, '\t', '\n', '\r', '\v' };
+        char just_trim_segments[5] { ' ', '\t', '\n', '\r', '\v' }; // TODO: TRIM - replace to std::isspace
         // member for use valid property name (not use "_" as first word)
         char just_valid_property_name[3] = { 'A', 'z', '_' };
     } just_syntax;
@@ -102,11 +102,13 @@ namespace just
     // TODO: Get status messages
     // static const struct { const char* msg_multitype_cast = ""; } just_error_msg;
 
-    //    template <typename T> struct get_type {
+    //    template <typename T, typename V>
+    //    struct get_type {
     //        static constexpr JustType type = JustType::Unknown;
     //    };
 
-    //    template <> struct get_type<void> {
+    //    template <typename T>
+    //    struct get_type<T, std::enable_if<std::is_integral<T>::value, bool>::type = false> {
     //        static constexpr JustType type = JustType::Null;
     //    };
 
@@ -372,30 +374,30 @@ namespace just
     }
 
     // method for fast get hash from string
-    method inline int just_string_to_hash_fast(const char* content, int contentLength = INT32_MAX)
+    method inline int just_string_to_hash_fast(const char* char_side, int contentLength = INT32_MAX)
     {
         int x = 1, y = 0;
-        while (*(content) && y++ < contentLength)
-            x *= *content;
+        while (*(char_side) && y++ < contentLength)
+            x *= *char_side;
         return x;
     }
 
     // method for check valid a unsigned number
-    method inline bool just_is_unsigned_jnumber(const char character) { return std::isdigit(character); }
+    method inline bool just_is_unsigned_jnumber(const char char_side) { return std::isdigit(char_side); }
 
     // method for check valid a signed number
-    method inline bool just_is_jnumber(const char character) { return just_is_unsigned_jnumber(character) || character == '-'; }
+    method inline bool just_is_jnumber(const char char_side) { return just_is_unsigned_jnumber(char_side) || char_side == '-'; }
 
     // method for check is real ?
-    method jbool just_is_jreal(const char* content, int* getLength)
+    method jbool just_is_jreal(const char* char_side, int* getLength)
     {
         bool real = false;
         for (;;) {
-            if (!just_is_jnumber(content[*getLength])) {
+            if (!just_is_jnumber(char_side[*getLength])) {
                 if (real)
                     break;
 
-                real = (content[*getLength] == just_syntax.just_dot);
+                real = (char_side[*getLength] == just_syntax.just_dot);
 
                 if (!real)
                     break;
@@ -406,27 +408,53 @@ namespace just
     }
 
     // method for check is bool ?
-    method inline jbool just_is_jbool(const char* content, int* getLength)
+    method inline jbool just_is_jbool(const char* char_side, int* getLength)
     {
-        if (!strncmp(content, just_syntax.just_true_string, *getLength = sizeof(just_syntax.just_true_string) - 1))
+        if (!strncmp(char_side, just_syntax.just_true_string, *getLength = sizeof(just_syntax.just_true_string) - 1))
             return true;
-        if (!strncmp(content, just_syntax.just_false_string, *getLength = sizeof(just_syntax.just_false_string) - 1))
+        if (!strncmp(char_side, just_syntax.just_false_string, *getLength = sizeof(just_syntax.just_false_string) - 1))
             return true;
         *getLength = 0;
         return false;
     }
 
     // method for get format from raw content, also to write in storage pointer
-    method int just_get_format(const char* content, just_storage** storage, JustType& containType, jvariant* outValue = nullptr)
+    method int just_get_format(const char* char_side, just_storage** storage, JustType& containType, jvariant* outValue = nullptr)
     {
-        int x;
+        /*
+         * Priority:
+         *  - JReal
+         *  - JNumber
+         *  - JBool
+         *  - JString
+         */
+
         void* mem;
         int offset = 0;
 
         // Null type
-        if (content == nullptr || *content == '\0') {
+        if (char_side == nullptr || *char_side == '\0') {
             containType = JustType::Null;
-        } else if (just_is_jbool(content, &offset)) { // Bool type -----------------------------------------------------------------------------
+        } else if (just_is_jreal(char_side, &offset)) { // Real type -----------------------------------------------------------------------------
+            containType = JustType::JustReal;
+            if (storage) {
+                jreal conv = std::atof(char_side);
+                // Copy to
+                mem = std::memcpy(storage_alloc_field(storage, containType), &conv, just_type_size(containType));
+                if (outValue)
+                    *outValue = mem;
+            }
+        } else if (just_is_jnumber(*char_side)) { // Number type ---------------------------------------------------------------------------------
+            jnumber conv;
+            containType = JustType::JustNumber;
+            offset = sscanf(char_side, "%lld", &conv);
+            if (storage) {
+                // Copy to
+                mem = std::memcpy(storage_alloc_field(storage, containType), &conv, just_type_size(containType));
+                if (outValue)
+                    *outValue = mem;
+            }
+        } else if (just_is_jbool(char_side, &offset)) { // Bool type -----------------------------------------------------------------------------
             containType = JustType::JustBoolean;
             if (storage) {
                 jbool conv = (offset == sizeof(just_syntax.just_true_string) - 1);
@@ -435,30 +463,10 @@ namespace just
                 if (outValue)
                     *outValue = mem;
             }
-
-        } else if (just_is_jnumber(*content)) { // Number type ---------------------------------------------------------------------------------
-            containType = JustType::JustNumber;
-            if (storage) {
-                jnumber conv = std::atoll(content);
-                // Copy to
-                mem = std::memcpy(storage_alloc_field(storage, containType), &conv, just_type_size(containType));
-                if (outValue)
-                    *outValue = mem;
-            }
-        } else if (just_is_jreal(content, &offset)) { // Real type -----------------------------------------------------------------------------
-            containType = JustType::JustReal;
-            if (storage) {
-                jreal conv = std::atof(content);
-                // Copy to
-                mem = std::memcpy(storage_alloc_field(storage, containType), &conv, just_type_size(containType));
-                if (outValue)
-                    *outValue = mem;
-            }
-        } else if (*content == just_syntax.just_format_string) { // String type ----------------------------------------------------------------
-
+        } else if (*char_side == just_syntax.just_format_string) { // String type ----------------------------------------------------------------
             ++offset;
-            for (; content[offset] != just_syntax.just_format_string; ++offset)
-                if (content[offset] == just_syntax.just_left_seperator && content[offset + 1] == just_syntax.just_format_string)
+            for (; char_side[offset] != just_syntax.just_format_string; ++offset)
+                if (char_side[offset] == just_syntax.just_left_seperator && char_side[offset + 1] == just_syntax.just_format_string)
                     ++offset;
             containType = JustType::JustString;
             if (--offset) {
@@ -466,10 +474,10 @@ namespace just
                     // TODO: Go support next for string. '\n' '\r' .etc.
                     jstring stringSyntax;
                     stringSyntax.reserve(offset);
-                    for (x = 0; x < offset; ++x) {
-                        if (content[x + 1] == just_syntax.just_left_seperator)
+                    for (int x = 0; x < offset; ++x) {
+                        if (char_side[x + 1] == just_syntax.just_left_seperator)
                             ++x;
-                        stringSyntax.push_back(content[x + 1]);
+                        stringSyntax.push_back(char_side[x + 1]);
                     }
 
                     // Copy to
@@ -486,43 +494,43 @@ namespace just
     }
 
     // method for check. has type in value
-    method inline jbool just_has_datatype(const char* content)
+    method inline jbool just_has_datatype(const char* char_side)
     {
         JustType type;
-        just_get_format(const_cast<char*>(content), nullptr, type);
-        return type != JustType::Unknown && type < JustType::Null;
+        just_get_format(const_cast<char*>(char_side), nullptr, type);
+        return type > JustType::Null;
     }
 
     // method for trim tabs, space, EOL (etc) to skip.
-    method int just_trim(const char* content, int contentLength = INT_MAX)
+    method int just_trim(const char* char_side, int contentLength = INT_MAX)
     {
         int x = 0;
-        if (content != nullptr)
-            for (int y; x < contentLength && *content;) {
+        if (char_side != nullptr)
+            for (int y; x < contentLength && *char_side;) {
                 for (y = 0; y < static_cast<int>(sizeof(just_syntax.just_trim_segments));)
-                    if (*content == just_syntax.just_trim_segments[y])
+                    if (*char_side == just_syntax.just_trim_segments[y])
                         break;
                     else
                         ++y;
                 if (y != sizeof(just_syntax.just_trim_segments)) {
                     ++x;
-                    ++content;
+                    ++char_side;
                 } else
                     break;
             }
         return x;
     }
 
-    method int just_skip(const char* c, int len = INT_MAX)
+    method int just_skip(const char* char_side, int length = INT_MAX)
     {
         int x, y;
-        char skipping[sizeof(just_syntax.just_trim_segments) + sizeof(just_syntax.just_block_segments)];
-        *skipping = 0;
+        char skipping[sizeof(just_syntax.just_trim_segments) + sizeof(just_syntax.just_block_segments) +1];
+        *skipping = x = 0;
         strncpy(skipping, just_syntax.just_trim_segments, sizeof(just_syntax.just_trim_segments));
         strncpy(skipping + sizeof just_syntax.just_trim_segments, just_syntax.just_block_segments, sizeof(just_syntax.just_block_segments));
-        for (x = 0; c[x] && x <= len;) {
+        for (; x < length;) {
             for (y = 0; y < sizeof(skipping);)
-                if (c[x] == skipping[y])
+                if (char_side[x] == skipping[y])
                     break;
                 else
                     ++y;
@@ -584,11 +592,10 @@ namespace just
 
     method jbool just_is_array(const char* content, int& endpoint, int contentLength = INT_MAX)
     {
-        int x;
         jbool result = false;
 
         if (*content == *just_syntax.just_block_segments) {
-            x = 1;
+            int x = 1;
             x += just_autoskip_comment(content + x, contentLength - x);
             if (just_has_datatype(content + x) || content[x] == just_syntax.just_block_segments[1]) {
                 for (; content[x] && x < contentLength; ++x) {
@@ -665,7 +672,7 @@ namespace just
 
         stack.emplace_back(storage_alloc_tree(&pstorage));
 
-        for (depth = x = 0; pointer < epointer;) {
+        for (depth = x = 0; pointer + x < epointer;) {
             // has comment line
             int y = x += just_autoskip_comment(pointer + x, length - x);
             if (depth > 0 && pointer[x] == just_syntax.just_block_segments[1])
@@ -719,7 +726,7 @@ namespace just
                                     }
                                 }
                                 // convert just numbers as JustReal
-                                else if (current_block_type != valueType)
+                                else if (false && current_block_type != valueType)
                                     throw std::runtime_error("Multi type is found.");
 
                                 switch (current_block_type) {
@@ -746,15 +753,16 @@ namespace just
                     }
 
                 } else { // enter the next node
-                    ++x;
                     // up next node
                     // x += just_avail_only(jstat, pointer + x, length - x);
 
+                    stack.emplace_back(storage_alloc_tree(&pstorage, stack.back())); // alloc tree on owner
+                    ++x;
                     ++depth;
                     // x += just_autoskip_comment(pointer + x, length - x);
                 }
 
-                if (pointer[x] != just_syntax.just_block_segments[1]) {
+                if (false && pointer[x] != just_syntax.just_block_segments[1]) {
                     // Error: Line in require end depth
                     throw std::bad_exception();
                 }
@@ -797,13 +805,167 @@ namespace just
                     _dbgLastNode = &_curIter->second;
             #endif
             */
-            // x += just_autoskip_comment(pointer + x, length - x);
+            x += just_autoskip_comment(pointer + x, length - x);
+        }
+    }
+
+    method void just_avail(just_storage** storage, just_stats& jstat, const char* source, int length)
+    {
+        int x, z;
+        int depth; // depths
+        JustType valueType;
+        JustType current_block_type;
+        just_storage* pstorage;
+        std::vector<jtree_t*> stack;
+        const char* pointer = source;
+        const char* epointer = source + length;
+
+        // TODO: Linear load
+
+        pstorage = storage_new_init();
+
+        stack.emplace_back(storage_alloc_tree(&pstorage));
+
+        for (depth = x = 0; pointer + x < epointer;) {
+            // has comment line
+            int y = x += just_autoskip_comment(pointer + x, length - x);
+            if (depth > 0 && pointer[x] == just_syntax.just_block_segments[1])
+                break;
+            x += just_skip(pointer + x, length - x);
+
+             // Preparing, check property name
+            if (!just_valid_property_name(pointer + y, x - y))
+                throw std::bad_exception();
+
+            // property name
+            // prototype_node.propertyName.append(just_source + y, static_cast<size_t>(x - y));
+
+            std::cout << jstring(pointer + y, static_cast<size_t>(x - y)) << std::endl;
+
+            //  has comment line
+            x += just_autoskip_comment(pointer + x, length - x);
+            // x += just_trim(pointer + x, length - x); // trim string
+            // is block or array
+            if (pointer[x] == *just_syntax.just_block_segments) {
+                if (just_is_array(pointer + x, y, length - x)) {
+                    y += x++;
+                    current_block_type = JustType::Unknown;
+                    // prototype_node.flags = Node_ArrayFlag;
+                    for (; x < y;) {
+                        x += just_autoskip_comment(pointer + x, y - x);
+                        // next index
+                        if (pointer[x] == just_syntax.just_obstacle)
+                            ++x;
+                        else {
+                            x += z = just_get_format(pointer + x, nullptr, valueType);
+
+                            // Just Node Object current value Type
+
+                            if (valueType != JustType::Unknown) {
+                                if (current_block_type == JustType::Unknown) {
+                                    current_block_type = valueType;
+                                    switch (current_block_type) {
+                                    case JustType::JustString:
+                                        ++jstat.jarrstrings;
+                                        break;
+                                    case JustType::JustBoolean:
+                                        ++jstat.jarrbools;
+                                        break;
+                                    case JustType::JustReal:
+                                        ++jstat.jarrreals;
+                                        break;
+                                    case JustType::JustNumber:
+                                        ++jstat.jarrnumbers;
+                                        break;
+                                    }
+                                }
+                                // convert just numbers as JustReal
+                                else if (false && current_block_type != valueType)
+                                    throw std::runtime_error("Multi type is found.");
+
+                                switch (current_block_type) {
+                                case JustType::JustString:
+                                    jstat.jarrstrings_total_bytes += z - 1;
+                                    // prototype_node.set_native_memory((void*)jalloc<std::vector<jstring>>());
+                                    break;
+                                case JustType::JustBoolean:
+                                    jstat.jarrbools_total_bytes += z;
+                                    // prototype_node.set_native_memory((void*)jalloc<std::vector<jbool>>());
+                                    break;
+                                case JustType::JustReal:
+                                    jstat.jarrreals_total_bytes += z;
+                                    // prototype_node.set_native_memory((void*)jalloc<std::vector<jreal>>());
+                                    break;
+                                case JustType::JustNumber:
+                                    jstat.jarrnumbers_total_bytes += z;
+                                    // prototype_node.set_native_memory((void*)jalloc<std::vector<jnumber>>());
+                                    break;
+                                }
+                            }
+                        }
+                        x += just_autoskip_comment(pointer + x, y - x);
+                    }
+
+                } else { // enter the next node
+                    // up next node
+                    // x += just_avail_only(jstat, pointer + x, length - x);
+
+                    stack.emplace_back(storage_alloc_tree(&pstorage, stack.back())); // alloc tree on owner
+                    ++x;
+                    ++depth;
+                    // x += just_autoskip_comment(pointer + x, length - x);
+                }
+
+                if (false && pointer[x] != just_syntax.just_block_segments[1]) {
+                    // Error: Line in require end depth
+                    throw std::bad_exception();
+                }
+                ++x;
+            } else { // get also value
+                x += z = just_get_format(pointer + x, nullptr, valueType);
+
+                switch (valueType) {
+                case JustType::JustString:
+                    ++jstat.jstrings;
+                    jstat.jarrnumbers_total_bytes += z - 1;
+                    break;
+                case JustType::JustBoolean:
+                    ++jstat.jbools;
+                    jstat.jarrbools_total_bytes += z;
+                    break;
+                case JustType::JustReal:
+                    ++jstat.jreals;
+                    jstat.jarrreals_total_bytes += z;
+                    break;
+                case JustType::JustNumber:
+                    ++jstat.jnumbers;
+                    jstat.jarrnumbers_total_bytes += z;
+                    break;
+                }
+
+                // prototype_node.set_native_memory(pointer);
+                // pointer = nullptr;
+                // prototype_node.flags = Node_ValueFlag | valueType << 2;
+            }
+
+            // entry.insert(std::make_pair(y = just_string_to_hash(prototype_node.propertyName.c_str()), prototype_node));
+
+            /*
+            #if defined(QDEBUG) || defined(DEBUG)
+                    // get iter
+                    auto _curIter = entry.find(j);
+                    if (_dbgLastNode) _dbgLastNode->nextNode = &_curIter->second;
+                    _curIter->second.prevNode = _dbgLastNode;
+                    _dbgLastNode = &_curIter->second;
+            #endif
+            */
+            x += just_autoskip_comment(pointer + x, length - x);
         }
     }
 
     // big algorithm, please free me.
     // divide and conquer method avail
-    method int just_avail(just_storage** storage, just_stats& eval, const char* source, int length, int depth)
+    method int bug_just_avail(just_storage** storage, just_stats& eval, const char* source, int length, int depth)
     {
         int x, y;
         const char* pointer;
@@ -919,7 +1081,7 @@ namespace just
                     auto _tree = storage_alloc_tree(storage);
 
                     ++x;
-                    x += just_avail(storage, eval, pointer + x, length - x, depth + 1);
+                    x += bug_just_avail(storage, eval, pointer + x, length - x, depth + 1);
                     // prototype_node.flags = Node_StructFlag;
 
                     // BUG: set node memory pointer (handle)
@@ -984,8 +1146,7 @@ namespace just
         // check buffer
         if ((buffer = (char*)malloc(length)) == nullptr)
             throw std::bad_alloc();
-        // set buffer to zero
-        std::memset(buffer, 0, length);
+
         // read
         length = file.read(buffer, length).gcount();
         // close file
@@ -1010,6 +1171,8 @@ namespace just
         // init storage
         _storage = storage_new_init();
         just_avail_only(eval, source, len);
+
+        int cc = eval.calcBytes();
     }
     method jstring just_object_parser::serialize(JustSerializeFormat format) const
     {
@@ -1053,7 +1216,7 @@ namespace just
         int hash;
         // get splits
         do {
-            if ((beta = nodePath.find(just_syntax.just_nodePathBreaker, alpha)) == ~0)
+            if ((beta = nodePath.find(just_syntax.just_tree_pathbrk, alpha)) == ~0)
                 beta = static_cast<int>(nodePath.length());
             hash = just_string_to_hash_fast(nodePath.c_str() + alpha, beta - alpha);
             iter = entry->find(hash);
