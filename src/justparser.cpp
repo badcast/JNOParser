@@ -248,7 +248,7 @@ namespace just
             // vault is not supported
             return nullptr;
 
-        jvariant _vp = reinterpret_cast<jvariant>((static_cast<jvariant>(pstorage + 1) + type * sizeof(void*)));
+        jvariant _vp = reinterpret_cast<jvariant>((reinterpret_cast<long>(pstorage + 1) + int(type) * sizeof(void*)));
         return _vp;
     }
 
