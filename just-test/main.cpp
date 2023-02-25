@@ -4,12 +4,22 @@
 // Include justparser
 #include <justparser>
 
+inline char fileseparator()
+{
+#ifdef WIN32
+    return '\\';
+#else
+    return '/';
+#endif
+}
+
 std::string getExecPath(std::string app, const std::string& combine = "")
 {
     using namespace std;
-    app.erase(app.find_last_of('/'), app.length());
+    std::cout << app;
+    app.erase(app.find_last_of(fileseparator()), app.length());
     if (!combine.empty())
-        app += '/' + combine;
+        app += fileseparator() + combine;
     return app;
 
 }
