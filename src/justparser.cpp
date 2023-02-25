@@ -202,6 +202,8 @@ namespace just
 #else
         _PAGE_SIZE = 4096;
 #endif
+
+        std::cout << _PAGE_SIZE;
         return _PAGE_SIZE;
     }
 
@@ -248,7 +250,7 @@ namespace just
             // vault is not supported
             return nullptr;
 
-        jvariant _vp = reinterpret_cast<jvariant>((reinterpret_cast<long>(pstorage + 1) + int(type) * sizeof(void*)));
+        jvariant _vp = reinterpret_cast<jvariant>((reinterpret_cast<std::size_t>(pstorage + 1) + int(type) * sizeof(void*)));
         return _vp;
     }
 
@@ -359,7 +361,7 @@ namespace just
         const void* delta = pstorage + 1;
         int type;
         if (pointer) {
-            type = JustType::Unknown;
+            type = static_cast<int>(JustType::Unknown);
             for (; alpha < delta; ++alpha) {
                 // get type
                 ++type;
@@ -368,7 +370,7 @@ namespace just
             }
         } else
             // ops: Type is null, var is empty
-            type = JustType::Null;
+            type = static_cast<int>(JustType::Null);
 
         return static_cast<JustType>(type);
     }
@@ -410,9 +412,9 @@ namespace just
     // method for check is bool ?
     method inline jbool just_is_jbool(const char* char_side, int* getLength)
     {
-        if (!strncmp(char_side, just_syntax.just_true_string, *getLength = sizeof(just_syntax.just_true_string) - 1))
+        if (!std::memcmp(char_side, just_syntax.just_true_string, *getLength = sizeof(just_syntax.just_true_string) - 1))
             return true;
-        if (!strncmp(char_side, just_syntax.just_false_string, *getLength = sizeof(just_syntax.just_false_string) - 1))
+        if (!std::memcmp(char_side, just_syntax.just_false_string, *getLength = sizeof(just_syntax.just_false_string) - 1))
             return true;
         *getLength = 0;
         return false;
@@ -1151,6 +1153,7 @@ namespace just
         length = file.read(buffer, length).gcount();
         // close file
         file.close();
+
         // deserialize
         deserialize((char*)buffer, length);
         // free buffer
@@ -1179,7 +1182,7 @@ namespace just
         jstring data;
         throw std::runtime_error("no complete");
 
-        if (format == JustBeautify) {
+        if (format == JustSerializeFormat::JustBeautify) {
             data += "//@Just Node Object Version: 1.0.0\n";
         }
 
