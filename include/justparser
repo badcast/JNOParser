@@ -3,6 +3,7 @@
 //  author: badcast <lmecomposer@gmail.com>
 //  github: github.com/badcast/just-parser
 //  soundcloud: soundcloud.com/light-mister
+//  license: GPLv3
 
 #ifndef JUST_PARSER_H
 #define JUST_PARSER_H
@@ -95,25 +96,29 @@ namespace just
         // Property 'has_value' is the value from this tree
         jbool has_value() const;
 
-        //        const jnumber value() const
-        //        {
-        //            return static_cast<jnumber>(get_int());
-        //        }
+        template <typename T, typename std::enable_if<std::is_integral<T>::value, std::nullptr_t>::type = nullptr>
+        const jnumber value() const
+        {
+            return get_int();
+        }
 
-        //        const jbool value() const
-        //        {
-        //            return static_cast<jbool>(get_bool());
-        //        }
+        template <typename T, typename std::enable_if<std::is_same<T, bool>::value, std::nullptr_t>::type = nullptr>
+        const jbool value() const
+        {
+            return get_bool();
+        }
 
-        //        const jreal value() const
-        //        {
-        //            return static_cast<jreal>(get_real());
-        //        }
+        template <typename T, typename std::enable_if<std::is_floating_point<T>::value, std::nullptr_t>::type = nullptr>
+        const jreal value() const
+        {
+            return get_real();
+        }
 
-        //        const jstring value() const
-        //        {
-        //            return static_cast<jstring>(get_str());
-        //        }
+        template <typename T, typename std::enable_if<std::is_same<T, jstring>::value>::type, std::nullptr_t = nullptr>
+        const jstring value() const
+        {
+            return get_str();
+        }
 
         jstring to_string() const;
 

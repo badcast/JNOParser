@@ -644,7 +644,7 @@ namespace just
         case JustType::Null:
             return jstring(just_syntax.just_null_string);
         }
-        return jstring();
+        return {};
     }
 
     just_object_node::operator jnumber() const { return get_int(); }
@@ -1124,7 +1124,9 @@ namespace just
     {
     }
 
-    just_object_parser::just_object_parser(JustAllocationMethod allocationMethod) { _storage = nullptr; }
+    just_object_parser::just_object_parser(JustAllocationMethod allocationMethod) {
+    //TODO: param allocationMethod is support feature
+    _storage = nullptr; }
 
     just_object_parser::~just_object_parser() { }
 
@@ -1150,7 +1152,7 @@ namespace just
             throw std::bad_alloc();
 
         // read
-        length = file.read(buffer, length).gcount();
+        length = file.readsome(buffer, length);
         // close file
         file.close();
 
