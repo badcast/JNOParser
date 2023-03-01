@@ -97,6 +97,10 @@ namespace just
         char just_trim_segments[5] { ' ', '\t', '\n', '\r', '\v' }; // TODO: TRIM - replace to std::isspace
         // member for use valid property name (not use "_" as first word)
         char just_valid_property_name[3] = { 'A', 'z', '_' };
+        // member for use negative number character
+        char just_negative_sym = '-';
+        // member for use positive number character
+        char just_positive_sym = '+';
     } just_syntax;
 
     // TODO: Get status messages
@@ -388,14 +392,31 @@ namespace just
     method inline bool just_is_unsigned_jnumber(const char char_side) { return std::isdigit(char_side); }
 
     // method for check valid a signed number
-    method inline bool just_is_jnumber(const char char_side) { return just_is_unsigned_jnumber(char_side) || char_side == '-'; }
+    method inline bool just_is_jnumber(const char* char_side, int* getLength)
+    {
+
+        int x = 0;
+        if (*char_side == just_syntax.just_negative_sym) {
+            ++x;
+            ++char_side;
+        }
+        const char* pointer = char_side;
+        for (; just_is_unsigned_jnumber(*pointer); ++x, ++pointer) {
+
+        }
+        if (getLength) {
+            *getLength = x;
+        }
+
+        return pointer - char_side > 0;
+    }
 
     // method for check is real ?
     method jbool just_is_jreal(const char* char_side, int* getLength)
     {
         bool real = false;
         for (;;) {
-            if (!just_is_jnumber(char_side[*getLength])) {
+            if (!just_is_unsigned_jnumber(char_side[*getLength])) {
                 if (real)
                     break;
 
@@ -440,16 +461,16 @@ namespace just
         } else if (just_is_jreal(char_side, &offset)) { // Real type -----------------------------------------------------------------------------
             containType = JustType::JustReal;
             if (storage) {
-                jreal conv = std::atof(char_side);
+                jreal conv = std::atof(char_side); // use "C++" method
                 // Copy to
                 mem = std::memcpy(storage_alloc_field(storage, containType), &conv, just_type_size(containType));
                 if (outValue)
                     *outValue = mem;
             }
-        } else if (just_is_jnumber(*char_side)) { // Number type ---------------------------------------------------------------------------------
+        } else if (just_is_jnumber(char_side, &offset)) { // Number type ---------------------------------------------------------------------------------
             jnumber conv;
             containType = JustType::JustNumber;
-            offset = sscanf(char_side, "%lld", &conv);
+            sscanf(char_side, "%lld", &conv); // use "C" method
             if (storage) {
                 // Copy to
                 mem = std::memcpy(storage_alloc_field(storage, containType), &conv, just_type_size(containType));
@@ -526,11 +547,10 @@ namespace just
     method int just_skip(const char* char_side, int length = INT_MAX)
     {
         int x, y;
-        char skipping[sizeof(just_syntax.just_trim_segments) + sizeof(just_syntax.just_block_segments) +1];
-        *skipping = x = 0;
+        char skipping[sizeof(just_syntax.just_trim_segments) + sizeof(just_syntax.just_block_segments)];
         strncpy(skipping, just_syntax.just_trim_segments, sizeof(just_syntax.just_trim_segments));
         strncpy(skipping + sizeof just_syntax.just_trim_segments, just_syntax.just_block_segments, sizeof(just_syntax.just_block_segments));
-        for (; x < length;) {
+        for (x = 0; x < length;) {
             for (y = 0; y < sizeof(skipping);)
                 if (char_side[x] == skipping[y])
                     break;
@@ -544,16 +564,16 @@ namespace just
         return x;
     }
 
-    method inline jbool just_valid_property_name(const char* c, int len)
+    method inline jbool just_valid_property_name(const char* char_side, int len)
     {
         int x;
-        for (x = 0; x < len; ++x, ++c)
-            if (!((*c >= *just_syntax.just_valid_property_name && *c <= just_syntax.just_valid_property_name[1]) || (x && just_is_unsigned_jnumber(*c)) || *c == just_syntax.just_valid_property_name[2]))
+        for (x = 0; x < len; ++x, ++char_side)
+            if (!((*char_side >= *just_syntax.just_valid_property_name && *char_side <= just_syntax.just_valid_property_name[1]) || (x && just_is_unsigned_jnumber(*char_side)) || *char_side == just_syntax.just_valid_property_name[2]))
                 return false;
         return len != 0;
     }
 
-    method inline jbool just_is_comment_line(const char* c, int len) { return len > 0 && !std::strncmp(c, just_syntax.just_commentLine, std::min(2, len)); }
+    method inline jbool just_is_comment_line(const char* char_side, int len) { return len > 0 && !std::strncmp(char_side, just_syntax.just_commentLine, std::min(2, len)); }
 
     method inline int just_has_eol(const char* pointer, int len = INT_MAX)
     {
@@ -565,10 +585,10 @@ namespace just
     }
 
     // method for skip comment's
-    method int just_autoskip_comment(const char* src, int len)
+    method int just_autoskip_comment(const char* char_side, int len)
     {
         int offset;
-        const char* pointer = src;
+        const char* pointer = char_side;
         pointer += offset = just_trim(pointer, len);
         while (just_is_comment_line(pointer, len - offset)) {
             // skip to EOL
@@ -582,28 +602,28 @@ namespace just
         return offset;
     }
 
-    method inline jbool just_is_space(const char c)
+    method inline jbool just_is_space(const char char_side)
     {
         const char* left = just_syntax.just_trim_segments;
         const char* right = left + sizeof(just_syntax.just_trim_segments);
         for (; left < right; ++left)
-            if (*left == c)
+            if (*left == char_side)
                 return true;
         return false;
     }
 
-    method jbool just_is_array(const char* content, int& endpoint, int contentLength = INT_MAX)
+    method jbool just_is_array(const char* char_side, int& endpoint, int contentLength = INT_MAX)
     {
         jbool result = false;
 
-        if (*content == *just_syntax.just_block_segments) {
+        if (*char_side == *just_syntax.just_block_segments) {
             int x = 1;
-            x += just_autoskip_comment(content + x, contentLength - x);
-            if (just_has_datatype(content + x) || content[x] == just_syntax.just_block_segments[1]) {
-                for (; content[x] && x < contentLength; ++x) {
-                    if (content[x] == just_syntax.just_block_segments[0])
+            x += just_autoskip_comment(char_side + x, contentLength - x);
+            if (just_has_datatype(char_side + x) || char_side[x] == just_syntax.just_block_segments[1]) {
+                for (; char_side[x] && x < contentLength; ++x) {
+                    if (char_side[x] == just_syntax.just_block_segments[0])
                         break;
-                    else if (content[x] == just_syntax.just_block_segments[1]) {
+                    else if (char_side[x] == just_syntax.just_block_segments[1]) {
                         endpoint = x;
                         result = true;
                         break;
@@ -690,7 +710,7 @@ namespace just
 
             std::cout << jstring(pointer + y, static_cast<size_t>(x - y)) << std::endl;
 
-            //  has comment line
+            // has comment line
             x += just_autoskip_comment(pointer + x, length - x);
             // x += just_trim(pointer + x, length - x); // trim string
             // is block or array
@@ -727,7 +747,7 @@ namespace just
                                         break;
                                     }
                                 }
-                                // convert just numbers as JustReal
+                                // can't convert just numbers as JustReal
                                 else if (false && current_block_type != valueType)
                                     throw std::runtime_error("Multi type is found.");
 
@@ -835,7 +855,7 @@ namespace just
                 break;
             x += just_skip(pointer + x, length - x);
 
-             // Preparing, check property name
+            // Preparing, check property name
             if (!just_valid_property_name(pointer + y, x - y))
                 throw std::bad_exception();
 
@@ -1124,9 +1144,10 @@ namespace just
     {
     }
 
-    just_object_parser::just_object_parser(JustAllocationMethod allocationMethod) {
-    //TODO: param allocationMethod is support feature
-    _storage = nullptr; }
+    just_object_parser::just_object_parser(JustAllocationMethod allocationMethod)
+    {
+        // TODO: param allocationMethod is support feature
+    }
 
     just_object_parser::~just_object_parser() { }
 
