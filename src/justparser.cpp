@@ -45,7 +45,7 @@ namespace just
             1       numbers
             2       reals
             3       strings
-            4       properties
+            4       trees
 
             ------------------------
             ISSUE:
@@ -54,8 +54,7 @@ namespace just
                 - How to get answer ? First use unsigned int as pointer in linear.
 
             VAULT:
-            - bools(1), numbers(2), reals(3), strings(4), trees(5)
-            -
+            - bools(0), numbers(1), reals(2), strings(3), trees(4)
 
     */
     struct just_storage {
@@ -65,7 +64,8 @@ namespace just
 
         // up members  : meta-info
         // down members: size-info
-        jnumber numBools, numNumbers, numReals, numStrings, numTrees, arrayBools, arrayNumbers, arrayReals, arrayStrings, just;
+        jnumber numBools, numNumbers, numReals, numStrings, numTrees, arrayBools, arrayNumbers, arrayReals, arrayStrings;
+        void* vault;
     };
 
     static const struct {
@@ -206,37 +206,46 @@ namespace just
 #else
         _PAGE_SIZE = 4096;
 #endif
-
-        std::cout << _PAGE_SIZE;
         return _PAGE_SIZE;
     }
 
     // method for create and init new storage.
     method inline just_storage* storage_new_init()
     {
+        just_storage* ptr;
         int pgSize = get_page_size();
-        void* ptr;
         pgSize = sizeof(just_storage) > pgSize ? sizeof(just_storage) : pgSize;
-        if (!(ptr = std::malloc(pgSize)))
+        if (!(ptr = static_cast<just_storage*>(std::malloc(pgSize))))
             throw std::bad_alloc();
 
         // init as 0
-        return static_cast<just_storage*>(std::memset(ptr, 0, pgSize));
+        std::memset(ptr, 0, pgSize);
+        // copy self address
+        std::size_t addr = std::size_t(&ptr->vault);
+        std::memcpy(&ptr->vault, &addr, sizeof(std::size_t));
+        return ptr;
+    }
+    method jvariant storage_get_vault(const just_storage* pstorage, const JustType type)
+    {
+        if (type < JustType::JustBoolean)
+            // vault is not supported
+            return nullptr;
+
+        jvariant _vp = reinterpret_cast<jvariant>((reinterpret_cast<std::size_t>(pstorage->vault) + (int(type) - 1) * sizeof(void*)));
+        return _vp;
     }
 
     // Get storage size from type order
-    method std::uint32_t storage_vault_info(const just_storage* pstorage, int flags)
+    method std::uint32_t storage_vault_info(const just_storage* pstorage, JustType type)
     {
         std::uint32_t calcSize;
-
-        JustType type = static_cast<JustType>(flags & 0xFF);
 
         if (!pstorage)
             throw std::bad_alloc();
 
         if (type > JustType::Null) {
             // move pointer to ...
-            const jnumber* alpha = reinterpret_cast<const jnumber*>(static_cast<const void*>(pstorage) + sizeof(pstorage->optimized)) + static_cast<int>(type);
+            const jnumber* alpha = reinterpret_cast<const jnumber*>(reinterpret_cast<std::size_t>(pstorage) + sizeof(pstorage->optimized)) + static_cast<int>(type);
 
             // low - count ~ high - sizes (all bytes)
             calcSize = (*alpha) >> 32;
@@ -248,14 +257,34 @@ namespace just
         return calcSize;
     }
 
-    method jvariant storage_get_vault(just_storage* pstorage, const JustType type)
+    // method for get type from pointer (storage required)
+    method JustType just_get_type(const just_storage* pstorage, const void* pointer)
     {
-        if (type < JustType::JustBoolean)
-            // vault is not supported
-            return nullptr;
+        const jnumber* alpha = reinterpret_cast<jnumber*>(reinterpret_cast<std::size_t>(pstorage) + sizeof(pstorage->optimized));
+        const void* delta = pstorage->vault;
+        int type;
+        if (pointer) {
+            type = static_cast<int>(JustType::Unknown);
+            if (pstorage->optimized) {
+                for (; pointer < delta; ++alpha) {
+                    // get type
+                    ++type;
+                    // set next pointer (from vault size)
+                    delta += static_cast<std::uint32_t>(*alpha >> 32); // high (bytes)
+                }
+            } else {
+                for (; pointer < delta; ++alpha) {
+                    // get type
+                    ++type;
+                    // set next pointer (from vault size)
+                    delta += static_cast<std::uint32_t>(*alpha >> 32); // high (bytes)
+                }
+            }
+        } else
+            // ops: Type is null, var is empty
+            type = static_cast<int>(JustType::Null);
 
-        jvariant _vp = reinterpret_cast<jvariant>((reinterpret_cast<std::size_t>(pstorage + 1) + int(type) * sizeof(void*)));
-        return _vp;
+        return static_cast<JustType>(type);
     }
 
     method jvariant storage_alloc_field(just_storage** pstore, JustType type, int size = 0)
@@ -280,7 +309,7 @@ namespace just
 
         if (type == JustType::JustTree) { // can be realloc ?
             // for tree
-            jvariant lptr = new jtree_t;
+            jtree_t* lptr = new jtree_t;
             std::memcpy(&_vault, static_cast<jvariant>(&lptr), sizeof(jvariant));
             ++(*pstore)->numTrees;
         } else { // for primary types
@@ -318,15 +347,27 @@ namespace just
         return _vault;
     }
 
-    // Method for get Pointer to Input Pointer (IPT). Lowest at pointer
-    method int storage_get_ipt(const just_storage* pstore, const jvariant pointer) { return 0; }
-    // Method from Input Pointer (IPT) to Pointer. Lowest at pointer
+    // Method for get Pointer to Internal Pointer (IPT). Lowest at pointer
+    method int storage_get_ipt(const just_storage* pstorage, const jvariant pointer)
+    {
+        int ipt = 0; // Input Pointer
+        if (pstorage->optimized) {
+            // TODO: OPTIMIZED STATE
+            throw std::exception();
+        } else {
+            // pstore->vault
+            const jvariant index = pstorage->vault;
+            JustType type = just_get_type(pstorage, pointer);
+        }
+        return ipt;
+    }
+    // Method from Internal Pointer (IPT) to Pointer. Lowest at pointer
     method jvariant storage_get_pointer(const just_storage* pstore, const int ipt) { return nullptr; }
-    // Create Main Tree
-    method jtree_t* storage_alloc_tree(just_storage** pstore, const jtree_t* owner = nullptr)
+    // Create Tree
+    method jtree_t* storage_alloc_tree(just_storage** pstore, jtree_t* owner = nullptr)
     {
         int ipt;
-        jtree_t* newTree;
+        jtree_t* pnewtree;
         if (pstore == nullptr || *pstore == nullptr)
             throw std::bad_alloc();
 
@@ -334,11 +375,14 @@ namespace just
             throw std::runtime_error("storage in optimized state");
         }
 
-        newTree = static_cast<jtree_t*>(storage_alloc_field(pstore, JustType::JustTree));
+        pnewtree = static_cast<jtree_t*>(storage_alloc_field(pstore, JustType::JustTree));
 
-        if (owner != nullptr) { }
+        if (owner != nullptr) {
+            int ipt = storage_get_ipt(*pstore, pnewtree);
+            owner->emplace_back(ipt);
+        }
 
-        return newTree;
+        return pnewtree;
     }
 
     // Create Array Node
@@ -358,33 +402,12 @@ namespace just
         // TODO: optimize here
     }
 
-    // method for get type from pointer (storage required)
-    method JustType just_get_type(const void* pointer, just_storage* pstorage)
-    {
-        const jnumber* alpha = static_cast<jnumber*>(static_cast<void*>(pstorage) + sizeof(pstorage->optimized));
-        const void* delta = pstorage + 1;
-        int type;
-        if (pointer) {
-            type = static_cast<int>(JustType::Unknown);
-            for (; alpha < delta; ++alpha) {
-                // get type
-                ++type;
-                // set next pointer
-                delta += static_cast<std::uint32_t>(*alpha >> 32); // high (bytes)
-            }
-        } else
-            // ops: Type is null, var is empty
-            type = static_cast<int>(JustType::Null);
-
-        return static_cast<JustType>(type);
-    }
-
     // method for fast get hash from string
     method inline int just_string_to_hash_fast(const char* char_side, int contentLength = INT32_MAX)
     {
         int x = 1, y = 0;
         while (*(char_side) && y++ < contentLength)
-            x *= *char_side;
+            x *= *(char_side++);
         return x;
     }
 
@@ -401,9 +424,7 @@ namespace just
             ++char_side;
         }
         const char* pointer = char_side;
-        for (; just_is_unsigned_jnumber(*pointer); ++x, ++pointer) {
-
-        }
+        for (; just_is_unsigned_jnumber(*pointer); ++x, ++pointer) { }
         if (getLength) {
             *getLength = x;
         }
@@ -642,7 +663,7 @@ namespace just
         this->_jhead = handle;
     }
 
-    method JustType just_object_node::type() const { just_get_type(_jhead, static_cast<just_storage*>(this->_jowner->_storage)); }
+    method JustType just_object_node::type() const { just_get_type(static_cast<just_storage*>(this->_jowner->_storage), _jhead); }
 
     method just_object_node* just_object_node::tree(const jstring& child) { return nullptr; }
 
@@ -698,6 +719,7 @@ namespace just
             // has comment line
             int y = x += just_autoskip_comment(pointer + x, length - x);
             if (depth > 0 && pointer[x] == just_syntax.just_block_segments[1])
+                // TODO: Next Depth (Up)
                 break;
             x += just_skip(pointer + x, length - x);
 
@@ -777,8 +799,8 @@ namespace just
                 } else { // enter the next node
                     // up next node
                     // x += just_avail_only(jstat, pointer + x, length - x);
-
                     stack.emplace_back(storage_alloc_tree(&pstorage, stack.back())); // alloc tree on owner
+
                     ++x;
                     ++depth;
                     // x += just_autoskip_comment(pointer + x, length - x);
@@ -788,7 +810,6 @@ namespace just
                     // Error: Line in require end depth
                     throw std::bad_exception();
                 }
-                ++x;
             } else { // get also value
                 x += z = just_get_format(pointer + x, nullptr, valueType);
 

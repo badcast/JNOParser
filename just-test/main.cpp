@@ -16,7 +16,6 @@ inline char fileseparator()
 std::string getExecPath(std::string app, const std::string& combine = "")
 {
     using namespace std;
-    std::cout << app;
     app.erase(app.find_last_of(fileseparator()), app.length());
     if (!combine.empty())
         app += fileseparator() + combine;
