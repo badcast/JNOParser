@@ -276,6 +276,8 @@ namespace just
                 for (; pointer < delta; ++alpha) {
                     // get type
                     ++type;
+                    std::uint32_t size = storage_vault_info(pstorage, static_cast<JustType>(type));
+
                     // set next pointer (from vault size)
                     delta += static_cast<std::uint32_t>(*alpha >> 32); // high (bytes)
                 }
@@ -887,7 +889,6 @@ namespace just
 
             //  has comment line
             x += just_autoskip_comment(pointer + x, length - x);
-            // x += just_trim(pointer + x, length - x); // trim string
             // is block or array
             if (pointer[x] == *just_syntax.just_block_segments) {
                 if (just_is_array(pointer + x, y, length - x)) {
