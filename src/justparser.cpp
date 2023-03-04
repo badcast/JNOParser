@@ -16,6 +16,8 @@
 #include <climits>
 #include <stack>
 #include <iostream>
+#include <set>
+
 // import header
 #include "justparser"
 
@@ -306,6 +308,7 @@ namespace just
 
         _vault = storage_get_vault(*pstore, type);
 
+        // value is null
         if (!_vault)
             return _vault;
 
