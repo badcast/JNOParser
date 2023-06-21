@@ -37,6 +37,8 @@ namespace just
     typedef std::vector<int> jtree_t;
 
     enum { Node_ValueFlag = 1, Node_ArrayFlag = 2, Node_TreeFlag = 3 };
+
+    /* Internal Pointer (IPT) */
     enum { Invalid_IPT = -1 };
 
     // NOTE: storage description
@@ -66,7 +68,16 @@ namespace just
 
         // up members  : meta-info
         // down members: size-info
-        jnumber numBools, numNumbers, numReals, numStrings, numTrees, arrayBools, arrayNumbers, arrayReals, arrayStrings;
+        jnumber numBools;
+        jnumber numNumbers;
+        jnumber numReals;
+        jnumber numStrings;
+        jnumber numTrees;
+
+        jnumber arrayBools;
+        jnumber arrayNumbers;
+        jnumber arrayReals;
+        jnumber arrayStrings;
         void* vault;
     };
 
@@ -104,58 +115,6 @@ namespace just
         // member for use positive number character
         char just_positive_sym = '+';
     } just_syntax;
-
-    // TODO: Get status messages
-    // static const struct { const char* msg_multitype_cast = ""; } just_error_msg;
-
-    //    template <typename T, typename V>
-    //    struct get_type {
-    //        static constexpr JustType type = JustType::Unknown;
-    //    };
-
-    //    template <typename T>
-    //    struct get_type<T, std::enable_if<std::is_integral<T>::value, bool>::type = false> {
-    //        static constexpr JustType type = JustType::Null;
-    //    };
-
-    //    template <> struct get_type<int> {
-    //        static constexpr JustType type = JustType::JustNumber;
-    //    };
-
-    //    template <> struct get_type<float> {
-    //        static constexpr JustType type = JustType::JustReal;
-    //    };
-
-    //    template <> struct get_type<double> {
-    //        static constexpr JustType type = JustType::JustReal;
-    //    };
-
-    //    template <> struct get_type<bool> {
-    //        static constexpr JustType type = JustType::JustBoolean;
-    //    };
-
-    //    template <> struct get_type<jstring> {
-    //        static constexpr JustType type = JustType::JustString;
-    //    };
-
-    //    template <> struct get_type<const char*> {
-    //        static constexpr JustType type = JustType::JustString;
-    //    };
-
-    method inline int just_type_size(const JustType type)
-    {
-        switch (type) {
-        case JustType::JustBoolean:
-            return sizeof(jbool);
-        case JustType::JustNumber:
-            return sizeof(jnumber);
-        case JustType::JustReal:
-            return sizeof(jreal);
-        case JustType::JustTree:
-            return sizeof(jtree_t);
-        }
-        return 0;
-    }
 
     struct just_stats {
         std::uint16_t jstrings;
@@ -196,7 +155,59 @@ namespace just
         }
     };
 
-    method inline int get_page_size()
+    method inline int system_get_page_size();
+
+    method inline int just_type_size(const JustType type);
+
+    extern "C" {
+    /*storage*/
+    /*exported native_c function*/ method inline just_storage* just_storage_new_init();
+    /*exported native_c function*/ method jvariant just_storage_get_vault(const just_storage* pstorage, const JustType type);
+    /*exported native_c function*/ method std::uint32_t just_storage_get_vault_info(const just_storage* pstorage, JustType type);
+    /*exported native_c function*/ method jvariant just_storage_alloc_field(just_storage** pstore, JustType type, int size);
+    /*exported native_c function*/ method int just_storage_get_ipt(const just_storage* pstorage, const jvariant pointer);
+    /*exported native_c function*/ method jvariant just_storage_get_pointer(const just_storage* pstore, const int ipt);
+    /*exported native_c function*/ method jtree_t* just_storage_alloc_tree(just_storage** pstore, jtree_t* owner);
+    /*exported native_c function*/ method jvariant just_storage_alloc_array(just_storage** pstore, JustType arrayType);
+    /*exported native_c function*/ method bool just_storage_optimize(just_storage** pstorage);
+    /*exported native_c function*/ method JustType just_storage_get_type(const just_storage* pstorage, const void* pointer);
+
+    /*parser*/
+    /*exported native_c function*/ method inline int just_string_to_hash_fast(const char* char_side, int contentLength);
+    /*exported native_c function*/ method inline bool just_is_unsigned_jnumber(const char char_side);
+    /*exported native_c function*/ method inline bool just_is_jnumber(const char* char_side, int* getLength);
+    /*exported native_c function*/ method jbool just_is_jreal(const char* char_side, int* getLength);
+    /*exported native_c function*/ method inline jbool just_is_jbool(const char* char_side, int* getLength);
+    /*exported native_c function*/ method int just_get_format(const char* char_side, just_storage** storage, JustType& containType, jvariant* outValue);
+    /*exported native_c function*/ method inline jbool just_has_datatype(const char* char_side);
+    /*exported native_c function*/ method int just_trim(const char* char_side, int contentLength);
+    /*exported native_c function*/ method int just_skip(const char* char_side, int length);
+    /*exported native_c function*/ method inline jbool just_valid_property_name(const char* char_side, int len);
+    /*exported native_c function*/ method inline jbool just_is_comment_line(const char* char_side, int len);
+    /*exported native_c function*/ method inline int just_has_eol(const char* pointer, int len);
+    /*exported native_c function*/ method int just_autoskip_comment(const char* char_side, int len);
+    /*exported native_c function*/ method inline jbool just_is_space(const char char_side);
+    /*exported native_c function*/ method jbool just_is_array(const char* char_side, int& endpoint, int contentLength);
+    /*exported native_c function*/ method void just_avail_only(just_stats& jstat, const char* source, int length);
+    /*exported native_c function*/ method void just_avail(just_storage** storage, just_stats& jstat, const char* source, int length);
+    /*exported native_c function*/ method int bug_just_avail(just_storage** storage, just_stats& eval, const char* source, int length, int depth);
+    }
+    method inline int just_type_size(const JustType type)
+    {
+        switch (type) {
+        case JustType::JustBoolean:
+            return sizeof(jbool);
+        case JustType::JustNumber:
+            return sizeof(jnumber);
+        case JustType::JustReal:
+            return sizeof(jreal);
+        case JustType::JustTree:
+            return sizeof(jtree_t);
+        }
+        return 0;
+    }
+
+    method inline int system_get_page_size()
     {
         int _PAGE_SIZE;
 #if __unix__ || __linux__
@@ -212,10 +223,10 @@ namespace just
     }
 
     // method for create and init new storage.
-    method inline just_storage* storage_new_init()
+    method inline just_storage* just_storage_new_init()
     {
         just_storage* ptr;
-        int pgSize = get_page_size();
+        int pgSize = system_get_page_size();
         pgSize = sizeof(just_storage) > pgSize ? sizeof(just_storage) : pgSize;
         if (!(ptr = static_cast<just_storage*>(std::malloc(pgSize))))
             throw std::bad_alloc();
@@ -227,7 +238,7 @@ namespace just
         std::memcpy(&ptr->vault, &addr, sizeof(std::size_t));
         return ptr;
     }
-    method jvariant storage_get_vault(const just_storage* pstorage, const JustType type)
+    method jvariant just_storage_get_vault(const just_storage* pstorage, const JustType type)
     {
         if (type < JustType::JustBoolean)
             // vault is not supported
@@ -238,7 +249,7 @@ namespace just
     }
 
     // Get storage size from type order
-    method std::uint32_t storage_vault_info(const just_storage* pstorage, JustType type)
+    method std::uint32_t just_storage_get_vault_info(const just_storage* pstorage, JustType type)
     {
         std::uint32_t calcSize;
 
@@ -260,28 +271,31 @@ namespace just
     }
 
     // method for get type from pointer (storage required)
-    method JustType just_get_type(const just_storage* pstorage, const void* pointer)
+    method JustType just_storage_get_type(const just_storage* pstorage, const void* pointer)
     {
         const jnumber* alpha = reinterpret_cast<jnumber*>(reinterpret_cast<std::size_t>(pstorage) + sizeof(pstorage->optimized));
         const void* delta = pstorage->vault;
         int type;
         if (pointer) {
-            type = static_cast<int>(JustType::Unknown);
+            type = static_cast<int>(JustType::JustBoolean);
             if (pstorage->optimized) {
                 for (; pointer < delta; ++alpha) {
-                    // get type
-                    ++type;
-                    // set next pointer (from vault size)
-                    delta += static_cast<std::uint32_t>(*alpha >> 32); // high (bytes)
-                }
-            } else {
-                for (; pointer < delta; ++alpha) {
-                    // get type
-                    ++type;
-                    std::uint32_t size = storage_vault_info(pstorage, static_cast<JustType>(type));
 
                     // set next pointer (from vault size)
                     delta += static_cast<std::uint32_t>(*alpha >> 32); // high (bytes)
+
+                    ++type;
+                }
+            } else {
+
+                for (; pointer < delta; ++alpha) {
+
+                    std::uint32_t size = just_storage_get_vault_info(pstorage, static_cast<JustType>(type));
+
+                    // set next pointer (from vault size)
+                    delta += static_cast<std::uint32_t>(*alpha >> 32); // high (bytes)
+
+                    ++type;
                 }
             }
         } else
@@ -291,13 +305,13 @@ namespace just
         return static_cast<JustType>(type);
     }
 
-    method jvariant storage_alloc_field(just_storage** pstore, JustType type, int size = 0)
+    method jvariant just_storage_alloc_field(just_storage** pstore, JustType type, int size = 0)
     {
         if (pstore == nullptr || *pstore == nullptr)
             throw std::bad_alloc();
 
         if ((*pstore)->optimized) {
-            throw std::runtime_error("storage in optimized state");
+            throw std::runtime_error("storage has optimized state");
         }
 
         // Storage Meta-info
@@ -306,7 +320,7 @@ namespace just
         // Check
         jvariant _vault;
 
-        _vault = storage_get_vault(*pstore, type);
+        _vault = just_storage_get_vault(*pstore, type);
 
         // value is null
         if (!_vault)
@@ -353,7 +367,7 @@ namespace just
     }
 
     // Method for get Pointer to Internal Pointer (IPT). Lowest at pointer
-    method int storage_get_ipt(const just_storage* pstorage, const jvariant pointer)
+    method int just_storage_get_ipt(const just_storage* pstorage, const jvariant pointer)
     {
         int ipt = 0; // Input Pointer
         if (pstorage->optimized) {
@@ -361,15 +375,15 @@ namespace just
             throw std::exception();
         } else {
             // pstore->vault
-            const jvariant index = pstorage->vault;
-            JustType type = just_get_type(pstorage, pointer);
+            // const jvariant index = pstorage->vault;
+            JustType type = just_storage_get_type(pstorage, pointer);
         }
         return ipt;
     }
     // Method from Internal Pointer (IPT) to Pointer. Lowest at pointer
-    method jvariant storage_get_pointer(const just_storage* pstore, const int ipt) { return nullptr; }
+    method jvariant just_storage_get_pointer(const just_storage* pstore, const int ipt) { return nullptr; }
     // Create Tree
-    method jtree_t* storage_alloc_tree(just_storage** pstore, jtree_t* owner = nullptr)
+    method jtree_t* just_storage_alloc_tree(just_storage** pstore, jtree_t* owner = nullptr)
     {
         int ipt;
         jtree_t* pnewtree;
@@ -380,10 +394,10 @@ namespace just
             throw std::runtime_error("storage in optimized state");
         }
 
-        pnewtree = static_cast<jtree_t*>(storage_alloc_field(pstore, JustType::JustTree));
+        pnewtree = static_cast<jtree_t*>(just_storage_alloc_field(pstore, JustType::JustTree));
 
         if (owner != nullptr) {
-            int ipt = storage_get_ipt(*pstore, pnewtree);
+            ipt = just_storage_get_ipt(*pstore, pnewtree);
             owner->emplace_back(ipt);
         }
 
@@ -391,7 +405,7 @@ namespace just
     }
 
     // Create Array Node
-    method jvariant storage_alloc_array(just_storage** pstore, JustType arrayType)
+    method jvariant just_storage_alloc_array(just_storage** pstore, JustType arrayType)
     {
         jvariant variant;
 
@@ -399,12 +413,13 @@ namespace just
     }
 
     // Optimize storage (ordering and compress)
-    method bool storage_optimize(just_storage** pstorage)
+    method bool just_storage_optimize(just_storage** pstorage)
     {
         if ((*pstorage)->optimized)
             return true;
 
         // TODO: optimize here
+        return false;
     }
 
     // method for fast get hash from string
@@ -489,7 +504,7 @@ namespace just
             if (storage) {
                 jreal conv = std::atof(char_side); // use "C++" method
                 // Copy to
-                mem = std::memcpy(storage_alloc_field(storage, containType), &conv, just_type_size(containType));
+                mem = std::memcpy(just_storage_alloc_field(storage, containType), &conv, just_type_size(containType));
                 if (outValue)
                     *outValue = mem;
             }
@@ -499,7 +514,7 @@ namespace just
             sscanf(char_side, "%lld", &conv); // use "C" method
             if (storage) {
                 // Copy to
-                mem = std::memcpy(storage_alloc_field(storage, containType), &conv, just_type_size(containType));
+                mem = std::memcpy(just_storage_alloc_field(storage, containType), &conv, just_type_size(containType));
                 if (outValue)
                     *outValue = mem;
             }
@@ -508,7 +523,7 @@ namespace just
             if (storage) {
                 jbool conv = (offset == sizeof(just_syntax.just_true_string) - 1);
                 // Copy to
-                mem = std::memcpy(storage_alloc_field(storage, containType), &conv, just_type_size(containType));
+                mem = std::memcpy(just_storage_alloc_field(storage, containType), &conv, just_type_size(containType));
                 if (outValue)
                     *outValue = mem;
             }
@@ -530,7 +545,7 @@ namespace just
                     }
 
                     // Copy to
-                    mem = std::memcpy(storage_alloc_field(storage, containType, stringSyntax.size()), stringSyntax.data(), stringSyntax.size());
+                    mem = std::memcpy(just_storage_alloc_field(storage, containType, stringSyntax.size()), stringSyntax.data(), stringSyntax.size());
                     if (outValue)
                         *outValue = mem;
                 }
@@ -668,7 +683,7 @@ namespace just
         this->_jhead = handle;
     }
 
-    method JustType just_object_node::type() const { just_get_type(static_cast<just_storage*>(this->_jowner->_storage), _jhead); }
+    method JustType just_object_node::type() const { just_storage_get_type(static_cast<just_storage*>(this->_jowner->_storage), _jhead); }
 
     method just_object_node* just_object_node::tree(const jstring& child) { return nullptr; }
 
@@ -716,9 +731,9 @@ namespace just
 
         // TODO: Linear load
 
-        pstorage = storage_new_init();
+        pstorage = just_storage_new_init();
 
-        stack.emplace_back(storage_alloc_tree(&pstorage));
+        stack.emplace_back(just_storage_alloc_tree(&pstorage));
 
         for (depth = x = 0; pointer + x < epointer;) {
             // has comment line
@@ -804,7 +819,7 @@ namespace just
                 } else { // enter the next node
                     // up next node
                     // x += just_avail_only(jstat, pointer + x, length - x);
-                    stack.emplace_back(storage_alloc_tree(&pstorage, stack.back())); // alloc tree on owner
+                    stack.emplace_back(just_storage_alloc_tree(&pstorage, stack.back())); // alloc tree on owner
 
                     ++x;
                     ++depth;
@@ -870,9 +885,9 @@ namespace just
 
         // TODO: Linear load
 
-        pstorage = storage_new_init();
+        pstorage = just_storage_new_init();
 
-        stack.emplace_back(storage_alloc_tree(&pstorage));
+        stack.emplace_back(just_storage_alloc_tree(&pstorage));
 
         for (depth = x = 0; pointer + x < epointer;) {
             // has comment line
@@ -957,7 +972,7 @@ namespace just
                     // up next node
                     // x += just_avail_only(jstat, pointer + x, length - x);
 
-                    stack.emplace_back(storage_alloc_tree(&pstorage, stack.back())); // alloc tree on owner
+                    stack.emplace_back(just_storage_alloc_tree(&pstorage, stack.back())); // alloc tree on owner
                     ++x;
                     ++depth;
                     // x += just_autoskip_comment(pointer + x, length - x);
@@ -1021,7 +1036,7 @@ namespace just
 
         std::vector<jtree_t*> _stacks;
 
-        _stacks.emplace_back(storage_alloc_tree(storage)); // push head tree
+        _stacks.emplace_back(just_storage_alloc_tree(storage)); // push head tree
 
 #define prototype_node (_stacks.back()) // set a macro name
 #define push(object) (_stacks.push_back(object))
@@ -1125,7 +1140,7 @@ namespace just
                     // BUG: Set node flags
                     // prototype_node.flags |= (current_block_type) << 2;
                 } else { // get the next node
-                    auto _tree = storage_alloc_tree(storage);
+                    auto _tree = just_storage_alloc_tree(storage);
 
                     ++x;
                     x += bug_just_avail(storage, eval, pointer + x, length - x, depth + 1);
@@ -1220,7 +1235,7 @@ namespace just
         }
 
         // init storage
-        _storage = storage_new_init();
+        _storage = just_storage_new_init();
         just_avail_only(eval, source, len);
 
         int cc = eval.calcBytes();
