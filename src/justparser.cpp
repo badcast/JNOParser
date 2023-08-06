@@ -82,7 +82,7 @@ namespace just
     };
 
     static const struct {
-        // member for use floating point (delimeter)
+        // member for use floating point (delimeter)ADSDS
         char just_dot = '.';
         // member for use seperate array data
         char just_obstacle = ',';
@@ -223,7 +223,7 @@ namespace just
     }
 
     // method for create and init new storage.
-    method inline just_storage* just_storage_new_init()
+    method just_storage* just_storage_new_init()
     {
         just_storage* ptr;
         int pgSize = system_get_page_size();
@@ -246,6 +246,11 @@ namespace just
 
         jvariant _vp = reinterpret_cast<jvariant>((reinterpret_cast<std::size_t>(pstorage->vault) + (int(type) - 1) * sizeof(void*)));
         return _vp;
+    }
+
+    method void just_storage_deinit(just_storage* pstorage){
+
+        free(pstorage);
     }
 
     // Get storage size from type order
@@ -328,8 +333,7 @@ namespace just
 
         if (type == JustType::JustTree) { // can be realloc ?
             // for tree
-            jtree_t* lptr = new jtree_t;
-            std::memcpy(&_vault, static_cast<jvariant>(&lptr), sizeof(jvariant));
+            _vault = new jtree_t;
             ++(*pstore)->numTrees;
         } else { // for primary types
 
@@ -369,7 +373,7 @@ namespace just
     // Method for get Pointer to Internal Pointer (IPT). Lowest at pointer
     method int just_storage_get_ipt(const just_storage* pstorage, const jvariant pointer)
     {
-        int ipt = 0; // Input Pointer
+        int ipt = 0; // Internal Pointer
         if (pstorage->optimized) {
             // TODO: OPTIMIZED STATE
             throw std::exception();
@@ -386,7 +390,7 @@ namespace just
     method jtree_t* just_storage_alloc_tree(just_storage** pstore, jtree_t* owner = nullptr)
     {
         int ipt;
-        jtree_t* pnewtree;
+        jtree_t* pjtree;
         if (pstore == nullptr || *pstore == nullptr)
             throw std::bad_alloc();
 
@@ -394,14 +398,14 @@ namespace just
             throw std::runtime_error("storage in optimized state");
         }
 
-        pnewtree = static_cast<jtree_t*>(just_storage_alloc_field(pstore, JustType::JustTree));
+        pjtree = static_cast<jtree_t*>(just_storage_alloc_field(pstore, JustType::JustTree));
 
         if (owner != nullptr) {
-            ipt = just_storage_get_ipt(*pstore, pnewtree);
+            ipt = just_storage_get_ipt(*pstore, pjtree);
             owner->emplace_back(ipt);
         }
 
-        return pnewtree;
+        return pjtree;
     }
 
     // Create Array Node
@@ -725,7 +729,7 @@ namespace just
         JustType valueType;
         JustType current_block_type;
         just_storage* pstorage;
-        std::vector<jtree_t*> stack;
+        std::vector<jtree_t*> tree;
         const char* pointer = source;
         const char* epointer = source + length;
 
@@ -733,7 +737,7 @@ namespace just
 
         pstorage = just_storage_new_init();
 
-        stack.emplace_back(just_storage_alloc_tree(&pstorage));
+        tree.emplace_back(just_storage_alloc_tree(&pstorage));
 
         for (depth = x = 0; pointer + x < epointer;) {
             // has comment line
@@ -819,7 +823,7 @@ namespace just
                 } else { // enter the next node
                     // up next node
                     // x += just_avail_only(jstat, pointer + x, length - x);
-                    stack.emplace_back(just_storage_alloc_tree(&pstorage, stack.back())); // alloc tree on owner
+                    tree.emplace_back(just_storage_alloc_tree(&pstorage, tree.back())); // alloc tree on owner
 
                     ++x;
                     ++depth;
@@ -1185,6 +1189,7 @@ namespace just
     }
 
     just_object_parser::just_object_parser(JustAllocationMethod allocationMethod)
+        : _storage(nullptr)
     {
         // TODO: param allocationMethod is support feature
     }
@@ -1237,8 +1242,6 @@ namespace just
         // init storage
         _storage = just_storage_new_init();
         just_avail_only(eval, source, len);
-
-        int cc = eval.calcBytes();
     }
     method jstring just_object_parser::serialize(JustSerializeFormat format) const
     {
