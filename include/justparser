@@ -145,9 +145,9 @@ namespace just
         virtual ~just_object_parser();
 
         void deserialize_from(const jstring& filename);
-        void deserialize(const std::string& source);
+        void deserialize(const jstring& source);
         void deserialize(const char* source, int len);
-        void deserialize(const std::string& content, int depth = -1);
+        void deserialize(const jstring& content, int depth = -1);
 
         // Serialize as string format (text structured data)
         jstring serialize(JustSerializeFormat format = JustSerializeFormat::JustCompact) const;
@@ -155,15 +155,15 @@ namespace just
         // Find node from childrens
         // example, "First/Second/Triple" -> Node
         // for has a node, contains method use.
-        just_object_node* at(const std::string& name);
+        just_object_node* at(const jstring& name);
 
         // search node by name or prefix value, example
-        just_object_node* search(const std::string& pattern);
+        just_object_node* search(const jstring& pattern);
 
         // result of occupied memory forevery nodes
         jnumber occupied_memory();
 
-        bool contains(const std::string& nodePath);
+        bool contains(const jstring& nodePath);
 
         int treeCount() const;
 
